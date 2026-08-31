@@ -16,8 +16,9 @@ LIMIT_PIN = 13
 
 STEP_DELAY = 0.001
 
-UP = GPIO.HIGH
-DOWN = GPIO.LOW
+# Swap these if the motor runs the wrong way.
+UP = GPIO.LOW
+DOWN = GPIO.HIGH
 
 _initialized = False
 

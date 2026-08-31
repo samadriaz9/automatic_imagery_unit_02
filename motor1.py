@@ -7,8 +7,8 @@ STEP_PIN  = 22   # CLK+
 LIMIT_PIN = 13
  
 # -- DIRECTIONS (swap if motor goes wrong way) --
-LEFT  = GPIO.LOW
-RIGHT = GPIO.HIGH
+LEFT  = GPIO.HIGH
+RIGHT = GPIO.LOW
 
 # -- SETUP -----------------------------
 GPIO.setmode(GPIO.BCM)
