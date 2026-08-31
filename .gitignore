@@ -1,0 +1,4 @@
+# Experiment captures (images, mosaics)
+data/
+__pycache__/
+*.pyc
