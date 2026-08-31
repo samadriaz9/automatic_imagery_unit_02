@@ -2,8 +2,8 @@ import RPi.GPIO as GPIO
 import time
  
 # -- PINS ------------------------------
-DIR_PIN   = 17
-STEP_PIN  = 18
+DIR_PIN   = 27
+STEP_PIN  = 22
 LIMIT_PIN = 6
 
 # -- DIRECTIONS (swap if motor goes wrong way) --------

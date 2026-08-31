@@ -1,9 +1,10 @@
 """
 Incubator lid stepper control (direct GPIO STEP + DIR + LIMIT).
 
-- STEP : GPIO6  (BCM), physical pin 31
-- DIR  : GPIO16 (BCM), physical pin 36
-- LIMIT: GPIO17 (BCM) — direct switch, PUD_UP, pressed = LOW
+Pin mapping (BCM) — driver pins swapped with petri_dishes on this unit:
+- STEP : 22
+- DIR  : 27
+- LIMIT: 6 (PUD_UP, pressed -> LOW)
 
 Hardware: tie EN on the driver to GND (or per datasheet).
 If limit is wired to a different GPIO, change LIMIT_PIN below.
@@ -12,8 +13,8 @@ import time
 
 import RPi.GPIO as GPIO
 
-STEP_PIN = 18
-DIR_PIN = 17
+STEP_PIN = 22
+DIR_PIN = 27
 LIMIT_PIN = 6
 
 STEP_DELAY = 0.001

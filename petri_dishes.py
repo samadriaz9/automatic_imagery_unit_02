@@ -1,17 +1,17 @@
 """
 Petri dishes stage stepper control (direct GPIO STEP + DIR + LIMIT).
 
-Pin mapping (BCM):
-- DIR  : 27
-- STEP : 22
+Pin mapping (BCM) — driver pins swapped with incubator_lid on this unit:
+- DIR  : 17
+- STEP : 18
 - LIMIT: 13 (PUD_UP, pressed -> LOW)
 """
 
 import time
 import RPi.GPIO as GPIO
 
-DIR_PIN = 27
-STEP_PIN = 22
+DIR_PIN = 17
+STEP_PIN = 18
 LIMIT_PIN = 13
 
 STEP_DELAY = 0.001
