@@ -51,9 +51,9 @@ def step_01_all_home():
 
 
 def step_02_insert_petri_dishes():
-    """Step 2: Insert petri dishes (lid up, petri home)."""
+    """Step 2: Open lid and move the tray out to the loading position."""
     incubator_lid_home()
-    petri_dishes_home()
+    petri_dishes_up(2370)
 
 
 def step_03_shift_for_incubation():

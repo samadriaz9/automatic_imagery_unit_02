@@ -15,6 +15,8 @@ STEP_PIN = 22
 LIMIT_PIN = 13
 
 STEP_DELAY = 0.001
+# Safety cap — homing normally stops on the limit switch.
+HOMING_MAX_STEPS = 5000
 
 # Swap these if the motor runs the wrong way.
 UP = GPIO.LOW
@@ -74,9 +76,12 @@ def petri_dishes_home():
     _ensure_gpio()
     GPIO.output(DIR_PIN, DOWN)
     time.sleep(STEP_DELAY)
-    while not _limit_pressed():
+    for _ in range(HOMING_MAX_STEPS):
+        if _limit_pressed():
+            print("Petri dishes: home reached.")
+            return
         _step(delay=STEP_DELAY)
-    print("Petri dishes: home reached.")
+    print("Petri dishes: homing stopped (max steps safety limit reached).")
 
 
 def cleanup():
