@@ -60,7 +60,7 @@ def step_03_shift_for_incubation():
     """Step 3: Shift stage for incubation region."""
     incubator_lid_home()
     petri_dishes_home()
-    petri_dishes_up(2370)
+    petri_dishes_down(2370)
     incubator_lid_down(700)
 
 
