@@ -7,8 +7,8 @@ STEP_PIN  = 22
 LIMIT_PIN = 13
 
 # -- DIRECTIONS (swap if motor goes wrong way) --------
-UP   = GPIO.HIGH
-DOWN = GPIO.LOW
+UP   = GPIO.LOW
+DOWN = GPIO.HIGH
  
 # -- SETUP -----------------------------
 GPIO.setmode(GPIO.BCM)
