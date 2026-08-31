@@ -5,7 +5,7 @@ import time
 
 DIR_PIN   = 23
 STEP_PIN  = 24
-LIMIT_PIN = 5
+LIMIT_PIN = 8
 
 delay = 0.001   # speed control
 
