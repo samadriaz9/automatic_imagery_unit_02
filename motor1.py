@@ -4,7 +4,7 @@ import time
 # -- PINS (BCM numbering) ---------------
 DIR_PIN   = 17   # CW+
 STEP_PIN  = 18   # CLK+
-LIMIT_PIN = 13
+LIMIT_PIN = 6
  
 # -- DIRECTIONS (swap if motor goes wrong way) --
 LEFT  = GPIO.LOW

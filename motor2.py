@@ -4,7 +4,7 @@ import time
 # -- PINS ------------------------------
 DIR_PIN   = 27
 STEP_PIN  = 22
-LIMIT_PIN = 6
+LIMIT_PIN = 13
 
 # -- DIRECTIONS (swap if motor goes wrong way) --------
 UP   = GPIO.HIGH
