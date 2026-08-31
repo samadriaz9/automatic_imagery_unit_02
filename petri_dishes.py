@@ -19,8 +19,8 @@ STEP_DELAY = 0.001
 HOMING_MAX_STEPS = 5000
 
 # Swap these if the motor runs the wrong way.
-UP = GPIO.HIGH
-DOWN = GPIO.LOW
+UP = GPIO.LOW
+DOWN = GPIO.HIGH
 
 _initialized = False
 
