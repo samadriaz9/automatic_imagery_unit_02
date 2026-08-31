@@ -46,7 +46,7 @@ def step_01_all_home():
     Camera_home()
     incubator_lid_home()
     petri_dishes_home()
-    petri_dishes_up(2670)
+    petri_dishes_up(2870)
     incubator_lid_down(700)
 
 
@@ -60,7 +60,7 @@ def step_03_shift_for_incubation():
     """Step 3: Shift stage for incubation region."""
     incubator_lid_home()
     petri_dishes_home()
-    petri_dishes_up(2670)
+    petri_dishes_up(2870)
     incubator_lid_down(700)
 
 
