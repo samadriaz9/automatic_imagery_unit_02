@@ -205,7 +205,7 @@ import RPi.GPIO as GPIO
 
 # Camera relay control (direct GPIO, no smbus/PCF8574).
 # Your wiring: physical pin 22 -> BCM25, active-low (relay OFF = HIGH).
-CAMERA_RELAY_GPIO = 25
+CAMERA_RELAY_GPIO = 21
 CAMERA_RELAY_ACTIVE = GPIO.LOW
 CAMERA_RELAY_INACTIVE = GPIO.HIGH
 CAMERA_RELAY_PULSE_S = 4.0
