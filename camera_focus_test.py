@@ -1,10 +1,11 @@
 """
 Camera focus / zoom test.
 
-1. Home the camera motor, then move UP 2000 steps.
-2. Pulse camera relay the same way as main.py (GPIO 21, 4 s, active-low).
-3. Live OpenCV preview so you can set zoom / focus.
-4. Close the window (or press Q): pulse relay 4 s (camera OFF) and GPIO.cleanup().
+1. Incubator lid home, petri dishes home, then petri dishes up 740.
+2. Home the camera motor, then move UP.
+3. Pulse camera relay the same way as main.py (GPIO 21, 4 s, active-low).
+4. Live OpenCV preview so you can set zoom / focus.
+5. Close the window (or press Q): pulse relay 4 s (camera OFF) and GPIO.cleanup().
 
 Run:
     python camera_focus_test.py
@@ -16,6 +17,9 @@ import cv2
 import RPi.GPIO as GPIO
 
 from camera_module import Camera_home, Camera_up, cleanup as camera_motor_cleanup
+from device_config import PETRI_DISH_PRE_UP
+from incubator_lid import incubator_lid_home, cleanup as incubator_lid_cleanup
+from petri_dishes import petri_dishes_home, petri_dishes_up, cleanup as petri_dishes_cleanup
 
 # Same relay wiring as main.py (not GPIO 25).
 CAMERA_RELAY_GPIO = 21
@@ -85,6 +89,8 @@ def shutdown():
     print(f"Camera OFF: relay pulse {CAMERA_RELAY_PULSE_S:.0f}s on GPIO {CAMERA_RELAY_GPIO}...")
     pulse_camera_relay(CAMERA_RELAY_PULSE_S)
     camera_motor_cleanup()
+    petri_dishes_cleanup()
+    incubator_lid_cleanup()
     GPIO.cleanup()
     print("GPIO released.")
 
@@ -92,6 +98,9 @@ def shutdown():
 def main():
     cap = None
     try:
+        incubator_lid_home()
+        petri_dishes_home()
+        petri_dishes_up(PETRI_DISH_PRE_UP)
         Camera_home()
         Camera_up(CAMERA_UP_STEPS)
 
