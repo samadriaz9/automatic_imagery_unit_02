@@ -75,7 +75,7 @@ def _configure_usb_capture(cap):
         pass
 
 
-def _open_usb_capture(device_index, attempts=6, wait_s=0.8):
+def _open_usb_capture(device_index, attempts=12, wait_s=1.0):
     """Open the USB camera; retry while V4L2 re-enumerates after a USB glitch."""
     idx = int(device_index)
     for n in range(max(1, int(attempts))):
@@ -101,11 +101,10 @@ def _open_usb_capture(device_index, attempts=6, wait_s=0.8):
     return None
 
 
-def _capture_frame(cap, out_path, flush_frames=2, read_retries=8, square_crop=False):
-    """Grab a fresh frame and save JPG (with retries for noisy streams)."""
+def _read_frame(cap, flush_frames=2, read_retries=8):
+    """Read one BGR frame from an open capture."""
     flush_frames = max(0, int(flush_frames))
     read_retries = max(1, int(read_retries))
-
     last_err = None
     for attempt in range(read_retries):
         try:
@@ -113,24 +112,48 @@ def _capture_frame(cap, out_path, flush_frames=2, read_retries=8, square_crop=Fa
                 with contextlib.redirect_stderr(io.StringIO()):
                     cap.grab()
                 time.sleep(0.02)
-
             with contextlib.redirect_stderr(io.StringIO()):
                 ok, frame = cap.read()
             if not ok or frame is None:
                 raise RuntimeError("USB camera frame read failed")
-
-            if bool(square_crop):
-                frame = _crop_center_square(frame)
-
-            ok_write = cv2.imwrite(out_path, frame)
-            if not ok_write:
-                raise RuntimeError("cv2.imwrite failed")
-            return
+            return frame
         except Exception as exc:
             last_err = exc
             time.sleep(0.15 * (attempt + 1))
-
     raise RuntimeError(f"USB camera capture failed after retries: {last_err}")
+
+
+def _write_frame(frame, out_path, square_crop=False):
+    if bool(square_crop):
+        frame = _crop_center_square(frame)
+    if not cv2.imwrite(out_path, frame):
+        raise RuntimeError("cv2.imwrite failed")
+
+
+def _capture_one_shot(device_index, out_path, square_crop=False):
+    """
+    Open camera, grab one frame, release USB, then save JPEG.
+
+    Releasing before encode/motor moves avoids a stale V4L2 handle after stepper EMI.
+    """
+    cap = _open_usb_capture(device_index)
+    if cap is None:
+        raise RuntimeError("USB camera open failed")
+    try:
+        frame = _read_frame(cap)
+    finally:
+        try:
+            cap.release()
+        except Exception:
+            pass
+        time.sleep(0.2)
+    _write_frame(frame, out_path, square_crop=square_crop)
+
+
+def _capture_frame(cap, out_path, flush_frames=2, read_retries=8, square_crop=False):
+    """Grab a fresh frame and save JPG (with retries for noisy streams)."""
+    frame = _read_frame(cap, flush_frames=flush_frames, read_retries=read_retries)
+    _write_frame(frame, out_path, square_crop=square_crop)
 
 
 def _crop_center_square(frame):
@@ -293,7 +316,7 @@ def start_imaging_capture_pattern(
     mosaic_center_fraction=1.0,
     mosaic_crop_top_px=600,
     mosaic_crop_right_px=600,
-    settle_seconds=0.6,
+    settle_seconds=1.0,
 ):
     """
     Capture one petri dish in a matrix/raster grid pattern.
@@ -327,17 +350,12 @@ def start_imaging_capture_pattern(
     output_dir = _ensure_dir(os.path.join(base_dir, stage_subdir)) if stage_subdir else base_dir
 
     idx = int(camera_device_index)
-    cap = _open_usb_capture(idx)
-    if cap is None:
-        raise CameraDisconnectError(
-            f"Could not open USB camera index {idx} (/dev/video{idx}). "
-            "Ensure no other code holds the device (stop preview threads first). "
-            "If the device is not at video0, pass camera_device_index=..."
-        )
+    cap = None
 
     try:
         row_step = int(petri_step_per_row)
         col_step = int(camera_step_per_col)
+        post_move_wait = max(1.0, float(settle_seconds))
 
         total_tiles = int(rows) * int(cols)
         image_idx = 1
@@ -347,24 +365,12 @@ def start_imaging_capture_pattern(
                 out_path = os.path.join(output_dir, img_name)
                 print(f"[Imaging] Capture {image_idx}/{total_tiles} (row {r + 1}, col {c + 1})")
                 try:
-                    _capture_frame(cap, out_path, square_crop=bool(square_crop))
+                    _capture_one_shot(idx, out_path, square_crop=bool(square_crop))
                 except Exception as exc:
-                    # USB stream can glitch after stepper motion; wait and reopen.
                     print(f"[Imaging] Retry after capture error at ({r}, {c}): {exc}")
+                    time.sleep(2.0)
                     try:
-                        cap.release()
-                    except Exception:
-                        pass
-                    time.sleep(1.0)
-                    cap = _open_usb_capture(idx)
-                    if cap is None:
-                        raise CameraDisconnectError(
-                            f"USB camera disconnected at row {r + 1}, col {c + 1}",
-                            row=r,
-                            col=c,
-                        ) from exc
-                    try:
-                        _capture_frame(cap, out_path, square_crop=bool(square_crop))
+                        _capture_one_shot(idx, out_path, square_crop=bool(square_crop))
                     except Exception as exc2:
                         raise CameraDisconnectError(
                             f"USB camera disconnected at row {r + 1}, col {c + 1}: {exc2}",
@@ -372,25 +378,22 @@ def start_imaging_capture_pattern(
                             col=c,
                         ) from exc2
                 image_idx += 1
-                time.sleep(settle_seconds)
 
-                # Move camera for next column in this row (except last col).
+                # Move only after USB is released (one-shot already closed the camera).
                 if c < cols - 1:
                     Camera_down(col_step)
-                    time.sleep(settle_seconds)
+                    time.sleep(post_move_wait)
 
-            # End-of-row reposition
             if r < rows - 1:
                 print(f"[Imaging] Next row: petri dishes UP {row_step} steps")
                 petri_dishes_up(row_step)
-                time.sleep(settle_seconds)
+                time.sleep(post_move_wait)
 
-                # Reset camera to column 0 for the next row (keeps square coverage).
                 if bool(camera_reset_each_row):
                     back_steps = int((cols - 1) * col_step)
                     if back_steps > 0:
                         Camera_up(back_steps)
-                    time.sleep(settle_seconds)
+                    time.sleep(post_move_wait)
 
         print(f"[Imaging] Capture complete: {output_dir}")
         if bool(save_mosaic):
@@ -442,7 +445,7 @@ def start_multi_petri_imaging(
     cols=8,
     camera_step_per_col=85,
     petri_step_per_row=85,
-    settle_seconds=0.6,
+    settle_seconds=1.0,
     first_dish=1,
     last_dish=None,
     **capture_kwargs,
