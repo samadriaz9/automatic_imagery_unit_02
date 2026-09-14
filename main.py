@@ -412,6 +412,10 @@ def _open_usb_camera(device_index=0):
     if not cap.isOpened():
         return None
     try:
+        cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
+        cap.set(cv2.CAP_PROP_FPS, 10)
         cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
     except Exception:
         pass

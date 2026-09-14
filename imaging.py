@@ -60,35 +60,59 @@ def _next_exp_dir(output_root=None):
         idx += 1
 
 
-def _open_usb_capture(device_index):
-    """Open the USB camera; return None if the device cannot be opened."""
+def _configure_usb_capture(cap):
+    """Prefer MJPEG 1080p. Uncompressed YUYV at 1080p overloads USB 2.0 on a Pi."""
+    try:
+        cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
+    except Exception:
+        pass
+    try:
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
+        cap.set(cv2.CAP_PROP_FPS, 10)
+        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+    except Exception:
+        pass
+
+
+def _open_usb_capture(device_index, attempts=6, wait_s=0.8):
+    """Open the USB camera; retry while V4L2 re-enumerates after a USB glitch."""
     idx = int(device_index)
-    if sys.platform.startswith("linux"):
-        cap = cv2.VideoCapture(idx, cv2.CAP_V4L2)
-    else:
-        cap = cv2.VideoCapture(idx)
-    if not cap.isOpened():
+    for n in range(max(1, int(attempts))):
+        if sys.platform.startswith("linux"):
+            with contextlib.redirect_stderr(io.StringIO()):
+                cap = cv2.VideoCapture(idx, cv2.CAP_V4L2)
+        else:
+            cap = cv2.VideoCapture(idx)
+        if cap is not None and cap.isOpened():
+            _configure_usb_capture(cap)
+            for _ in range(2):
+                with contextlib.redirect_stderr(io.StringIO()):
+                    cap.grab()
+            return cap
         try:
-            cap.release()
+            if cap is not None:
+                cap.release()
         except Exception:
             pass
-        return None
-    return cap
+        if n + 1 < int(attempts):
+            print(f"[Imaging] USB camera not ready (try {n + 1}/{attempts}), waiting {wait_s:.1f}s...")
+            time.sleep(float(wait_s))
+    return None
 
 
-def _capture_frame(cap, out_path, flush_frames=4, read_retries=5, square_crop=False):
+def _capture_frame(cap, out_path, flush_frames=2, read_retries=8, square_crop=False):
     """Grab a fresh frame and save JPG (with retries for noisy streams)."""
     flush_frames = max(0, int(flush_frames))
     read_retries = max(1, int(read_retries))
 
     last_err = None
-    for _ in range(read_retries):
+    for attempt in range(read_retries):
         try:
-            # Drop a few frames so we get something closer to current position.
             for _ in range(flush_frames):
                 with contextlib.redirect_stderr(io.StringIO()):
                     cap.grab()
-                time.sleep(0.01)
+                time.sleep(0.02)
 
             with contextlib.redirect_stderr(io.StringIO()):
                 ok, frame = cap.read()
@@ -104,7 +128,7 @@ def _capture_frame(cap, out_path, flush_frames=4, read_retries=5, square_crop=Fa
             return
         except Exception as exc:
             last_err = exc
-            time.sleep(0.05)
+            time.sleep(0.15 * (attempt + 1))
 
     raise RuntimeError(f"USB camera capture failed after retries: {last_err}")
 
@@ -269,7 +293,7 @@ def start_imaging_capture_pattern(
     mosaic_center_fraction=1.0,
     mosaic_crop_top_px=600,
     mosaic_crop_right_px=600,
-    settle_seconds=0.15,
+    settle_seconds=0.6,
 ):
     """
     Capture one petri dish in a matrix/raster grid pattern.
@@ -311,13 +335,6 @@ def start_imaging_capture_pattern(
             "If the device is not at video0, pass camera_device_index=..."
         )
 
-    # Best-effort: request consistent resolution for decoding/saving.
-    try:
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
-        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
-    except Exception:
-        pass
-
     try:
         row_step = int(petri_step_per_row)
         col_step = int(camera_step_per_col)
@@ -332,12 +349,13 @@ def start_imaging_capture_pattern(
                 try:
                     _capture_frame(cap, out_path, square_crop=bool(square_crop))
                 except Exception as exc:
-                    # USB stream can glitch after stepper motion; reopen once and retry.
+                    # USB stream can glitch after stepper motion; wait and reopen.
                     print(f"[Imaging] Retry after capture error at ({r}, {c}): {exc}")
                     try:
                         cap.release()
                     except Exception:
                         pass
+                    time.sleep(1.0)
                     cap = _open_usb_capture(idx)
                     if cap is None:
                         raise CameraDisconnectError(
@@ -345,11 +363,6 @@ def start_imaging_capture_pattern(
                             row=r,
                             col=c,
                         ) from exc
-                    try:
-                        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
-                        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
-                    except Exception:
-                        pass
                     try:
                         _capture_frame(cap, out_path, square_crop=bool(square_crop))
                     except Exception as exc2:
@@ -429,7 +442,7 @@ def start_multi_petri_imaging(
     cols=8,
     camera_step_per_col=85,
     petri_step_per_row=85,
-    settle_seconds=0.15,
+    settle_seconds=0.6,
     first_dish=1,
     last_dish=None,
     **capture_kwargs,
