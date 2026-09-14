@@ -13,6 +13,7 @@ to run the capture pattern and save images.
 
 import os
 import io
+import glob
 import contextlib
 import sys
 import time
@@ -22,6 +23,62 @@ import numpy as np
 
 from camera_module import Camera_up, Camera_down
 from petri_dishes import petri_dishes_up
+
+# lsusb: Bus 001 Device 007: ID 1b3f:2002 Generalplus Technology Inc. 808 Camera
+USB_CAMERA_VENDOR = "1b3f"
+USB_CAMERA_PRODUCT = "2002"
+
+
+def resolve_usb_camera_index(preferred=0):
+    """
+    Find the V4L2 index for the Generalplus 808 camera by USB ID.
+
+    After a USB reset the node is often no longer /dev/video0 (lsusb device
+    number jumps 004 → 007). Always re-scan before opening.
+    """
+    fallback = int(preferred)
+    if not sys.platform.startswith("linux"):
+        return fallback
+
+    matches = []
+    for path in sorted(glob.glob("/sys/class/video4linux/video*")):
+        name = os.path.basename(path)
+        if not name.startswith("video"):
+            continue
+        try:
+            idx = int(name.replace("video", ""))
+        except ValueError:
+            continue
+        try:
+            card = open(os.path.join(path, "name"), encoding="utf-8").read().strip()
+        except OSError:
+            card = ""
+        if "metadata" in card.lower():
+            continue
+
+        cur = os.path.realpath(os.path.join(path, "device"))
+        vendor = product = None
+        for _ in range(10):
+            vp = os.path.join(cur, "idVendor")
+            pp = os.path.join(cur, "idProduct")
+            if os.path.isfile(vp) and os.path.isfile(pp):
+                try:
+                    vendor = open(vp, encoding="utf-8").read().strip().lower()
+                    product = open(pp, encoding="utf-8").read().strip().lower()
+                except OSError:
+                    vendor = product = None
+                break
+            parent = os.path.dirname(cur)
+            if parent == cur:
+                break
+            cur = parent
+
+        if vendor == USB_CAMERA_VENDOR and product == USB_CAMERA_PRODUCT:
+            matches.append(idx)
+
+    if matches:
+        return min(matches)
+    return fallback
 
 
 class CameraDisconnectError(RuntimeError):
@@ -77,8 +134,8 @@ def _configure_usb_capture(cap):
 
 def _open_usb_capture(device_index, attempts=12, wait_s=1.0):
     """Open the USB camera; retry while V4L2 re-enumerates after a USB glitch."""
-    idx = int(device_index)
     for n in range(max(1, int(attempts))):
+        idx = resolve_usb_camera_index(device_index)
         if sys.platform.startswith("linux"):
             with contextlib.redirect_stderr(io.StringIO()):
                 cap = cv2.VideoCapture(idx, cv2.CAP_V4L2)
@@ -96,7 +153,10 @@ def _open_usb_capture(device_index, attempts=12, wait_s=1.0):
         except Exception:
             pass
         if n + 1 < int(attempts):
-            print(f"[Imaging] USB camera not ready (try {n + 1}/{attempts}), waiting {wait_s:.1f}s...")
+            print(
+                f"[Imaging] USB camera not ready at /dev/video{idx} "
+                f"(try {n + 1}/{attempts}), waiting {wait_s:.1f}s..."
+            )
             time.sleep(float(wait_s))
     return None
 
