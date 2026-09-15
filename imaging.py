@@ -24,23 +24,32 @@ import numpy as np
 from camera_module import Camera_up, Camera_down
 from petri_dishes import petri_dishes_up
 
-# lsusb: Bus 001 Device 007: ID 1b3f:2002 Generalplus Technology Inc. 808 Camera
+# lsusb: ID 1b3f:2002 Generalplus Technology Inc. 808 Camera
 USB_CAMERA_VENDOR = "1b3f"
 USB_CAMERA_PRODUCT = "2002"
 
 
-def resolve_usb_camera_index(preferred=0):
-    """
-    Find the V4L2 index for the Generalplus 808 camera by USB ID.
-
-    After a USB reset the node is often no longer /dev/video0 (lsusb device
-    number jumps 004 → 007). Always re-scan before opening.
-    """
-    fallback = int(preferred)
+def usb_camera_on_bus():
+    """True if lsusb would still list the 808 camera (USB device present)."""
     if not sys.platform.startswith("linux"):
-        return fallback
+        return True
+    for vendor_path in glob.glob("/sys/bus/usb/devices/*/idVendor"):
+        product_path = os.path.join(os.path.dirname(vendor_path), "idProduct")
+        try:
+            vendor = open(vendor_path, encoding="utf-8").read().strip().lower()
+            product = open(product_path, encoding="utf-8").read().strip().lower()
+        except OSError:
+            continue
+        if vendor == USB_CAMERA_VENDOR and product == USB_CAMERA_PRODUCT:
+            return True
+    return False
 
+
+def list_usb_camera_video_indices():
+    """V4L2 capture nodes for the 808 camera (skips metadata nodes)."""
     matches = []
+    if not sys.platform.startswith("linux"):
+        return matches
     for path in sorted(glob.glob("/sys/class/video4linux/video*")):
         name = os.path.basename(path)
         if not name.startswith("video"):
@@ -75,10 +84,20 @@ def resolve_usb_camera_index(preferred=0):
 
         if vendor == USB_CAMERA_VENDOR and product == USB_CAMERA_PRODUCT:
             matches.append(idx)
+    return matches
 
+
+def resolve_usb_camera_index(preferred=0):
+    """
+    Find the V4L2 index for the Generalplus 808 camera by USB ID.
+
+    After a USB reset the node is often no longer /dev/video0 (lsusb device
+    number jumps 004 → 007 → 010). Always re-scan before opening.
+    """
+    matches = list_usb_camera_video_indices()
     if matches:
         return min(matches)
-    return fallback
+    return int(preferred)
 
 
 class CameraDisconnectError(RuntimeError):
@@ -132,30 +151,53 @@ def _configure_usb_capture(cap):
         pass
 
 
-def _open_usb_capture(device_index, attempts=12, wait_s=1.0):
-    """Open the USB camera; retry while V4L2 re-enumerates after a USB glitch."""
-    for n in range(max(1, int(attempts))):
-        idx = resolve_usb_camera_index(device_index)
-        if sys.platform.startswith("linux"):
-            with contextlib.redirect_stderr(io.StringIO()):
-                cap = cv2.VideoCapture(idx, cv2.CAP_V4L2)
-        else:
-            cap = cv2.VideoCapture(idx)
-        if cap is not None and cap.isOpened():
-            _configure_usb_capture(cap)
-            for _ in range(2):
-                with contextlib.redirect_stderr(io.StringIO()):
-                    cap.grab()
-            return cap
+def _open_index(idx):
+    """Open one V4L2 node and confirm it can deliver a frame."""
+    if sys.platform.startswith("linux"):
+        node = f"/dev/video{int(idx)}"
+        with contextlib.redirect_stderr(io.StringIO()):
+            cap = cv2.VideoCapture(node, cv2.CAP_V4L2)
+    else:
+        cap = cv2.VideoCapture(int(idx))
+    if cap is None or not cap.isOpened():
         try:
             if cap is not None:
                 cap.release()
         except Exception:
             pass
+        return None
+    _configure_usb_capture(cap)
+    try:
+        with contextlib.redirect_stderr(io.StringIO()):
+            ok, frame = cap.read()
+        if ok and frame is not None:
+            return cap
+    except Exception:
+        pass
+    try:
+        cap.release()
+    except Exception:
+        pass
+    return None
+
+
+def _open_usb_capture(device_index, attempts=20, wait_s=1.5):
+    """Open the USB camera; retry while V4L2 re-enumerates after a USB glitch."""
+    preferred = int(device_index)
+    for n in range(max(1, int(attempts))):
+        on_bus = usb_camera_on_bus()
+        indices = list_usb_camera_video_indices()
+        if not indices:
+            indices = [preferred]
+        for idx in indices:
+            cap = _open_index(idx)
+            if cap is not None:
+                print(f"[Imaging] Opened USB camera at /dev/video{idx}")
+                return cap
         if n + 1 < int(attempts):
+            why = "USB present, waiting for /dev/video" if on_bus else "USB camera not on bus yet"
             print(
-                f"[Imaging] USB camera not ready at /dev/video{idx} "
-                f"(try {n + 1}/{attempts}), waiting {wait_s:.1f}s..."
+                f"[Imaging] {why} (try {n + 1}/{attempts}), waiting {wait_s:.1f}s..."
             )
             time.sleep(float(wait_s))
     return None
@@ -433,22 +475,51 @@ def start_imaging_capture_pattern(
                 try:
                     _capture_frame(cap, out_path, square_crop=bool(square_crop))
                 except Exception as extra:
-                    print(f"[Imaging] Stream stall at ({r}, {c}): {extra} — reopening camera")
-                    cap = _reopen_usb_capture(cap, idx)
-                    if cap is None:
-                        raise CameraDisconnectError(
-                            f"USB camera disconnected at row {r + 1}, col {c + 1}",
-                            row=r,
-                            col=c,
-                        ) from extra
-                    try:
-                        _capture_frame(cap, out_path, square_crop=bool(square_crop))
-                    except Exception as extra:
-                        raise CameraDisconnectError(
-                            f"USB camera disconnected at row {r + 1}, col {c + 1}: {extra}",
-                            row=r,
-                            col=c,
-                        ) from extra
+                    print(f"[Imaging] Stream stall at ({r}, {c}): {extra}")
+                    recovered = False
+                    for recover_n in range(1, 9):
+                        on_bus = usb_camera_on_bus()
+                        print(
+                            f"[Imaging] V4L2 recover {recover_n}/8 "
+                            f"(USB {'connected' if on_bus else 'missing'})"
+                        )
+                        cap = _reopen_usb_capture(cap, idx)
+                        if cap is None:
+                            if on_bus:
+                                time.sleep(1.5)
+                                continue
+                            raise CameraDisconnectError(
+                                f"USB camera unplugged at row {r + 1}, col {c + 1}",
+                                row=r,
+                                col=c,
+                            ) from extra
+                        try:
+                            _capture_frame(cap, out_path, square_crop=bool(square_crop))
+                            recovered = True
+                            break
+                        except Exception as stall:
+                            extra = stall
+                            time.sleep(1.0)
+                    if not recovered:
+                        if usb_camera_on_bus():
+                            print(
+                                "[Imaging] Camera still listed on USB (lsusb) but "
+                                "video node is not responding — retrying this tile"
+                            )
+                            time.sleep(2.0)
+                            cap = _reopen_usb_capture(cap, idx)
+                            if cap is None:
+                                raise RuntimeError(
+                                    "808 camera is on USB but /dev/video is not usable. "
+                                    "Unplug/replug the camera or use another USB port."
+                                )
+                            _capture_frame(cap, out_path, square_crop=bool(square_crop))
+                        else:
+                            raise CameraDisconnectError(
+                                f"USB camera disconnected at row {r + 1}, col {c + 1}",
+                                row=r,
+                                col=c,
+                            ) from extra
                 image_idx += 1
                 time.sleep(settle_seconds)
 

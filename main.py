@@ -403,26 +403,9 @@ _usb_camera_worker = None
 def _open_usb_camera(device_index=0):
     """Open USB camera with Linux V4L2 backend to avoid GStreamer instability."""
     _suppress_opencv_logs()
-    if sys.platform.startswith("linux"):
-        from imaging import resolve_usb_camera_index
+    from imaging import _open_usb_capture
 
-        idx = resolve_usb_camera_index(device_index)
-        with contextlib.redirect_stderr(io.StringIO()):
-            cap = cv2.VideoCapture(idx, cv2.CAP_V4L2)
-    else:
-        idx = int(device_index)
-        cap = cv2.VideoCapture(idx)
-    if not cap.isOpened():
-        return None
-    try:
-        cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
-        cap.set(cv2.CAP_PROP_FPS, 15)
-        cap.set(cv2.CAP_PROP_BUFFERSIZE, 2)
-    except Exception:
-        pass
-    return cap
+    return _open_usb_capture(device_index, attempts=8, wait_s=1.0)
 
 
 def shutdown_all():
