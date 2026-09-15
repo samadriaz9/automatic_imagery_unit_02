@@ -33,28 +33,34 @@ def _limit_pressed():
     return GPIO.input(LIMIT_PIN) == GPIO.LOW
 
 
-def _step(steps, direction_high):
+def _step(steps, direction_high, keepalive=None):
     """Run a given number of steps in one direction."""
     _ensure_gpio()
     GPIO.output(DIR_PIN, GPIO.HIGH if direction_high else GPIO.LOW)
 
-    for _ in range(steps):
+    keep_every = 20
+    for i in range(max(0, int(steps))):
         GPIO.output(STEP_PIN, GPIO.HIGH)
         time.sleep(delay)
         GPIO.output(STEP_PIN, GPIO.LOW)
         time.sleep(delay)
+        if keepalive is not None and i % keep_every == 0:
+            try:
+                keepalive()
+            except Exception:
+                pass
 
 
-def Camera_up(steps):
+def Camera_up(steps, keepalive=None):
     """Move camera motor UP by the given number of steps."""
     print(f"Camera: moving UP {steps} steps")
-    _step(steps, direction_high=False)  # DIR LOW = UP
+    _step(steps, direction_high=False, keepalive=keepalive)  # DIR LOW = UP
 
 
-def Camera_down(steps):
+def Camera_down(steps, keepalive=None):
     """Move camera motor DOWN by the given number of steps."""
     print(f"Camera: moving DOWN {steps} steps")
-    _step(steps, direction_high=True)  # DIR HIGH = DOWN
+    _step(steps, direction_high=True, keepalive=keepalive)  # DIR HIGH = DOWN
 
 
 def Camera_home():

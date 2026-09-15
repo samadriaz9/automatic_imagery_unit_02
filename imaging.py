@@ -118,16 +118,16 @@ def _next_exp_dir(output_root=None):
 
 
 def _configure_usb_capture(cap):
-    """Prefer MJPEG 1080p. Uncompressed YUYV at 1080p overloads USB 2.0 on a Pi."""
+    """MJPEG 720p — the Generalplus 808 often stalls if held at 1080p."""
     try:
         cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
     except Exception:
         pass
     try:
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
-        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
-        cap.set(cv2.CAP_PROP_FPS, 10)
-        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+        cap.set(cv2.CAP_PROP_FPS, 15)
+        cap.set(cv2.CAP_PROP_BUFFERSIZE, 2)
     except Exception:
         pass
 
@@ -161,7 +161,28 @@ def _open_usb_capture(device_index, attempts=12, wait_s=1.0):
     return None
 
 
-def _read_frame(cap, flush_frames=2, read_retries=8):
+def _pump_stream(cap):
+    """Keep the UVC stream alive so the 808 camera does not stall during motor moves."""
+    if cap is None:
+        return
+    try:
+        with contextlib.redirect_stderr(io.StringIO()):
+            cap.grab()
+    except Exception:
+        pass
+
+
+def _reopen_usb_capture(cap, device_index):
+    try:
+        if cap is not None:
+            cap.release()
+    except Exception:
+        pass
+    time.sleep(0.4)
+    return _open_usb_capture(device_index)
+
+
+def _read_frame(cap, flush_frames=1, read_retries=5):
     """Read one BGR frame from an open capture."""
     flush_frames = max(0, int(flush_frames))
     read_retries = max(1, int(read_retries))
@@ -356,7 +377,7 @@ def start_imaging_capture_pattern(
     mosaic_center_fraction=1.0,
     mosaic_crop_top_px=600,
     mosaic_crop_right_px=600,
-    settle_seconds=1.0,
+    settle_seconds=0.25,
 ):
     """
     Capture one petri dish in a matrix/raster grid pattern.
@@ -412,7 +433,14 @@ def start_imaging_capture_pattern(
                 try:
                     _capture_frame(cap, out_path, square_crop=bool(square_crop))
                 except Exception as extra:
-                    print(f"[Imaging] Retry after capture error at ({r}, {c}): {extra}")
+                    print(f"[Imaging] Stream stall at ({r}, {c}): {extra} — reopening camera")
+                    cap = _reopen_usb_capture(cap, idx)
+                    if cap is None:
+                        raise CameraDisconnectError(
+                            f"USB camera disconnected at row {r + 1}, col {c + 1}",
+                            row=r,
+                            col=c,
+                        ) from extra
                     try:
                         _capture_frame(cap, out_path, square_crop=bool(square_crop))
                     except Exception as extra:
@@ -425,18 +453,21 @@ def start_imaging_capture_pattern(
                 time.sleep(settle_seconds)
 
                 if c < cols - 1:
-                    Camera_down(col_step)
+                    Camera_down(col_step, keepalive=lambda: _pump_stream(cap))
+                    _pump_stream(cap)
                     time.sleep(settle_seconds)
 
             if r < rows - 1:
                 print(f"[Imaging] Next row: petri dishes UP {row_step} steps")
                 petri_dishes_up(row_step)
+                _pump_stream(cap)
                 time.sleep(settle_seconds)
 
                 if bool(camera_reset_each_row):
                     back_steps = int((cols - 1) * col_step)
                     if back_steps > 0:
-                        Camera_up(back_steps)
+                        Camera_up(back_steps, keepalive=lambda: _pump_stream(cap))
+                    _pump_stream(cap)
                     time.sleep(settle_seconds)
 
         print(f"[Imaging] Capture complete: {output_dir}")
@@ -489,7 +520,7 @@ def start_multi_petri_imaging(
     cols=8,
     camera_step_per_col=85,
     petri_step_per_row=85,
-    settle_seconds=1.0,
+    settle_seconds=0.25,
     first_dish=1,
     last_dish=None,
     **capture_kwargs,
