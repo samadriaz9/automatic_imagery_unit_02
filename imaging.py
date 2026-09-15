@@ -412,12 +412,12 @@ def start_imaging_capture_pattern(
                 try:
                     _capture_frame(cap, out_path, square_crop=bool(square_crop))
                 except Exception as extra:
-                    print(f"[Imaging] Retry after capture error at ({r}, {c}): {exc}")
+                    print(f"[Imaging] Retry after capture error at ({r}, {c}): {extra}")
                     try:
                         _capture_frame(cap, out_path, square_crop=bool(square_crop))
                     except Exception as extra:
                         raise CameraDisconnectError(
-                            f"USB camera disconnected at row {r + 1}, col {c + 1}: {exc2}",
+                            f"USB camera disconnected at row {r + 1}, col {c + 1}: {extra}",
                             row=r,
                             col=c,
                         ) from extra
