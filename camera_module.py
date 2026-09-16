@@ -2,10 +2,11 @@ import RPi.GPIO as GPIO
 import time
 
 # Camera motor pins (BCM numbering) — this Pi: previous petri dish motor pins
+# Limit swapped with incubator lid on this Pi.
 
 DIR_PIN   = 17
 STEP_PIN  = 18
-LIMIT_PIN = 8
+LIMIT_PIN = 6
 
 delay = 0.001   # speed control
 

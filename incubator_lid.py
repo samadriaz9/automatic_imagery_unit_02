@@ -4,7 +4,7 @@ Incubator lid stepper control (direct GPIO STEP + DIR + LIMIT).
 Pin mapping (BCM) — this Pi: lid motor pins, petri limit switch:
 - STEP : 22
 - DIR  : 27
-- LIMIT: 6 (PUD_UP, pressed -> LOW)
+- LIMIT: 8 (PUD_UP, pressed -> LOW)
 
 Hardware: tie EN on the driver to GND (or per datasheet).
 If limit is wired to a different GPIO, change LIMIT_PIN below.
@@ -15,7 +15,7 @@ import RPi.GPIO as GPIO
 
 STEP_PIN = 22
 DIR_PIN = 27
-LIMIT_PIN = 6
+LIMIT_PIN = 8
 
 STEP_DELAY = 0.001
 # Safety cap only — homing normally stops on the limit switch.
