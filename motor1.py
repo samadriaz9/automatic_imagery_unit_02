@@ -2,9 +2,9 @@ import RPi.GPIO as GPIO
 import time
  
 # -- PINS (BCM numbering) ---------------
-DIR_PIN   = 17   # CW+
-STEP_PIN  = 18   # CLK+
-LIMIT_PIN = 6
+DIR_PIN   = 23   # CW+
+STEP_PIN  = 24   # CLK+
+LIMIT_PIN = 13
  
 # -- DIRECTIONS (swap if motor goes wrong way) --
 LEFT  = GPIO.HIGH

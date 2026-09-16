@@ -4,8 +4,8 @@ import time
 import os
 from datetime import datetime
  
-DIR_PIN   = 23
-STEP_PIN  = 24
+DIR_PIN   = 17
+STEP_PIN  = 18
 RELAY_PIN = 26
 LIMIT_PIN = 5
  
