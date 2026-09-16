@@ -21,8 +21,8 @@ from device_config import PETRI_DISH_PRE_UP
 from incubator_lid import incubator_lid_home, cleanup as incubator_lid_cleanup
 from petri_dishes import petri_dishes_home, petri_dishes_up, cleanup as petri_dishes_cleanup
 
-# Same relay wiring as main.py (not GPIO 25).
-CAMERA_RELAY_GPIO = 21
+# Same relay wiring as main.py (physical pin 22 = BCM 25).
+CAMERA_RELAY_GPIO = 25
 CAMERA_RELAY_ACTIVE = GPIO.LOW
 CAMERA_RELAY_INACTIVE = GPIO.HIGH
 CAMERA_RELAY_PULSE_S = 4.0
