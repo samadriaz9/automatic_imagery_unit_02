@@ -55,13 +55,13 @@ def _step(steps, direction_high, keepalive=None):
 def Camera_up(steps, keepalive=None):
     """Move camera motor UP by the given number of steps."""
     print(f"Camera: moving UP {steps} steps")
-    _step(steps, direction_high=False, keepalive=keepalive)  # DIR LOW = UP
+    _step(steps, direction_high=True, keepalive=keepalive)  # DIR HIGH = UP
 
 
 def Camera_down(steps, keepalive=None):
     """Move camera motor DOWN by the given number of steps."""
     print(f"Camera: moving DOWN {steps} steps")
-    _step(steps, direction_high=True, keepalive=keepalive)  # DIR HIGH = DOWN
+    _step(steps, direction_high=False, keepalive=keepalive)  # DIR LOW = DOWN
 
 
 def Camera_home():
@@ -74,7 +74,7 @@ def Camera_home():
     _ensure_gpio()
 
     # Set direction for DOWN (match Camera_down mapping).
-    GPIO.output(DIR_PIN, GPIO.HIGH)
+    GPIO.output(DIR_PIN, GPIO.LOW)
 
     while True:
         if _limit_pressed():
