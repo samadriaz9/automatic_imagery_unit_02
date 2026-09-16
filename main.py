@@ -405,7 +405,7 @@ def _open_usb_camera(device_index=0):
     _suppress_opencv_logs()
     from imaging import _open_usb_capture
 
-    return _open_usb_capture(device_index, attempts=8, wait_s=1.0)
+    return _open_usb_capture(device_index)
 
 
 def shutdown_all():

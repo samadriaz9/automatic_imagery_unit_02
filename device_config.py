@@ -36,6 +36,12 @@ MID_ROW_IMAGING_TEMP_C = 37.0
 MID_ROW_IMAGING_MIN = 4.0
 DISHES_PER_TRAY_ROW = PETRI_TRAY_COLS
 
+# USB capture: short settle + flush stale frames before save
+CAPTURE_SETTLE_SECONDS = 0.2
+CAPTURE_FRAME_COUNT = 2
+CAPTURE_DISCARD_FRAMES = 1  # of the 2 frames; save the last one
+MOTION_SETTLE_SECONDS = 0.08  # short pause after motors (vibration)
+
 # Camera disconnect during imaging: all home → incubate → retry the failed dish
 CAMERA_DISCONNECT_RECOVERY_TEMP_C = 37.0
 CAMERA_DISCONNECT_RECOVERY_MIN = 5.0
