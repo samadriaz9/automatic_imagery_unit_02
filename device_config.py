@@ -1,7 +1,7 @@
 """Shared hardware / imaging constants for main and GUI."""
 
 IMAGING_ROWS = 7
-IMAGING_COLS = 7
+IMAGING_COLS = 6
 CAMERA_STEPSIZE = 111
 PETRI_STEPSIZE = 115
 
