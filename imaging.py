@@ -317,8 +317,8 @@ def start_imaging_capture_pattern(
     save_mosaic=True,
     mosaic_name="mosaic.jpg",
     mosaic_center_fraction=1.0,
-    mosaic_crop_top_px=600,
-    mosaic_crop_right_px=600,
+    mosaic_crop_top_px=0,
+    mosaic_crop_right_px=0,
     settle_seconds=CAPTURE_SETTLE_SECONDS,
     capture_frames=CAPTURE_FRAME_COUNT,
     discard_frames=CAPTURE_DISCARD_FRAMES,
@@ -340,9 +340,9 @@ def start_imaging_capture_pattern(
     forced to match camera step).
 
     Capture grid is ``rows``×``cols`` (default 8×8 = 64 tiles). ``mosaic.jpg`` is a full ``rows``×``cols`` stitch
-    (axis swap + flip Y for this rig). After assembly, ``mosaic_crop_top_px`` pixels are removed
-    from the top and ``mosaic_crop_right_px`` from the right (default 600 each). Set both to 0 for
-    no trim. ``mosaic_center_fraction`` uses only the center fraction of each tile before placing
+    (axis swap + flip Y for this rig). After assembly, ``mosaic_crop_top_px`` / ``mosaic_crop_right_px``
+    can trim the mosaic (default 0 = no trim). ``mosaic_center_fraction`` uses only the center
+    fraction of each tile before placing
     (default 1.0 = full tile).
 
     After each move the camera waits ``settle_seconds`` (default 0.2s) and
