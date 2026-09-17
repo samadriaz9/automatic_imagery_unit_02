@@ -23,10 +23,17 @@ import numpy as np
 from camera_module import Camera_up, Camera_down
 from petri_dishes import petri_dishes_up
 from device_config import (
+    CAMERA_DISH_PRE_UP_ROW2,
+    CAMERA_STEPSIZE,
     CAPTURE_DISCARD_FRAMES,
     CAPTURE_FRAME_COUNT,
     CAPTURE_SETTLE_SECONDS,
+    IMAGING_COLS,
+    IMAGING_ROWS,
     MOTION_SETTLE_SECONDS,
+    PETRI_DISH_PRE_UP_ROW2,
+    PETRI_STEPSIZE,
+    PETRI_TRAY_COLS,
 )
 
 
@@ -308,10 +315,10 @@ def start_imaging_capture_pattern(
     experiment_dir=None,
     stage_subdir=None,
     camera_device_index=0,
-    rows=8,
-    cols=8,
-    camera_step_per_col=85,
-    petri_step_per_row=85,
+    rows=IMAGING_ROWS,
+    cols=IMAGING_COLS,
+    camera_step_per_col=CAMERA_STEPSIZE,
+    petri_step_per_row=PETRI_STEPSIZE,
     camera_reset_each_row=True,
     square_crop=True,
     save_mosaic=True,
@@ -339,11 +346,12 @@ def start_imaging_capture_pattern(
     ``camera_step_per_col`` and ``petri_step_per_row`` are independent (petri is no longer
     forced to match camera step).
 
-    Capture grid is ``rows``×``cols`` (default 8×8 = 64 tiles). ``mosaic.jpg`` is a full ``rows``×``cols`` stitch
-    (axis swap + flip Y for this rig). After assembly, ``mosaic_crop_top_px`` / ``mosaic_crop_right_px``
-    can trim the mosaic (default 0 = no trim). ``mosaic_center_fraction`` uses only the center
-    fraction of each tile before placing
-    (default 1.0 = full tile).
+    Capture grid is ``rows``×``cols`` from ``device_config`` (IMAGING_ROWS × IMAGING_COLS).
+    ``mosaic.jpg`` is a full ``rows``×``cols`` stitch (axis swap + flip Y for this rig).
+    After assembly, ``mosaic_crop_top_px`` / ``mosaic_crop_right_px`` can trim the mosaic
+    (default 0 = no trim). ``mosaic_center_fraction`` uses only the center fraction of each
+    tile before placing (default 1.0 = full tile). Step sizes come from CAMERA_STEPSIZE /
+    PETRI_STEPSIZE in ``device_config``.
 
     After each move the camera waits ``settle_seconds`` (default 0.2s) and
     keeps the last of a couple of flushed frames.
@@ -481,13 +489,13 @@ def start_multi_petri_imaging(
     experiment_dir=None,
     petri_offset_per_dish=None,
     camera_offset_per_dish=None,
-    tray_cols=5,
-    petri_pre_up_row2=1400,
-    camera_pre_up_row2=3730,
-    rows=8,
-    cols=8,
-    camera_step_per_col=85,
-    petri_step_per_row=85,
+    tray_cols=PETRI_TRAY_COLS,
+    petri_pre_up_row2=PETRI_DISH_PRE_UP_ROW2,
+    camera_pre_up_row2=CAMERA_DISH_PRE_UP_ROW2,
+    rows=IMAGING_ROWS,
+    cols=IMAGING_COLS,
+    camera_step_per_col=CAMERA_STEPSIZE,
+    petri_step_per_row=PETRI_STEPSIZE,
     settle_seconds=CAPTURE_SETTLE_SECONDS,
     first_dish=1,
     last_dish=None,
