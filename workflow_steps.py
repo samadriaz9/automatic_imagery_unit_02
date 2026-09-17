@@ -90,8 +90,8 @@ def step_05_post_imaging_cleanup():
     """Step 5b: Park after imaging."""
     incubator_lid_home()
     petri_dishes_home()
-    petri_dishes_up(2370)
-    incubator_lid_down(700)
+    petri_dishes_up(2800)
+    incubator_lid_down(400)
 
 
 def step_06_sterilize():
