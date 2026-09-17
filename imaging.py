@@ -535,7 +535,11 @@ def start_multi_petri_imaging(
     tc = max(1, int(tray_cols))
     row_step = int(petri_step_per_row)
     col_step = int(camera_step_per_col)
-    petri_off = int(petri_offset_per_dish if petri_offset_per_dish is not None else row_step * 7)
+    petri_off = int(
+        petri_offset_per_dish
+        if petri_offset_per_dish is not None
+        else row_step * max(0, int(rows) - 1)
+    )
     cam_off = int(camera_offset_per_dish if camera_offset_per_dish is not None else col_step)
 
     if experiment_dir:

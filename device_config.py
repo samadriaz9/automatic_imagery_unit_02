@@ -10,6 +10,11 @@ CAMERA_DISH_PRE_UP = 3850
 PETRI_DISH_PRE_UP_ROW2 = 1460
 CAMERA_DISH_PRE_UP_ROW2 = 3750
 
+# Between dishes in a tray row: undo the within-dish petri travel so the next
+# dish starts at the same PRE_UP height (do not use a fixed *7 from the old 8-row grid).
+PETRI_OFFSET_PER_DISH = PETRI_STEPSIZE * (IMAGING_ROWS - 1)
+CAMERA_OFFSET_PER_DISH = CAMERA_STEPSIZE
+
 PETRI_TRAY_ROWS = 2
 PETRI_TRAY_COLS = 5
 MAX_PETRI_DISHES = PETRI_TRAY_ROWS * PETRI_TRAY_COLS

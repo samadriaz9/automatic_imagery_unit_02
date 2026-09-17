@@ -11,6 +11,7 @@ from device_config import (
     CAMERA_DISCONNECT_RECOVERY_TEMP_C,
     CAMERA_DISH_PRE_UP,
     CAMERA_DISH_PRE_UP_ROW2,
+    CAMERA_OFFSET_PER_DISH,
     CAMERA_STEPSIZE,
     DEFAULT_ROUND_ENABLED,
     DEFAULT_ROUND_TEMPS,
@@ -27,6 +28,7 @@ from device_config import (
     STEP_INCUBATION_TEMP_C,
     PETRI_DISH_PRE_UP,
     PETRI_DISH_PRE_UP_ROW2,
+    PETRI_OFFSET_PER_DISH,
     PETRI_STEPSIZE,
     PETRI_TRAY_COLS,
 )
@@ -116,8 +118,8 @@ def _run_multi_petri_capture(num, capture_root, first_dish, last_dish):
         tray_cols=PETRI_TRAY_COLS,
         petri_pre_up_row2=PETRI_DISH_PRE_UP_ROW2,
         camera_pre_up_row2=CAMERA_DISH_PRE_UP_ROW2,
-        petri_offset_per_dish=PETRI_STEPSIZE * 7,
-        camera_offset_per_dish=CAMERA_STEPSIZE,
+        petri_offset_per_dish=PETRI_OFFSET_PER_DISH,
+        camera_offset_per_dish=CAMERA_OFFSET_PER_DISH,
         rows=IMAGING_ROWS,
         cols=IMAGING_COLS,
         camera_step_per_col=CAMERA_STEPSIZE,
@@ -136,8 +138,8 @@ def _log_msg(msg, on_log=None):
 def _prepare_imaging_for_dish(dish):
     """Home and move to the start position of a 1-based dish (after recovery)."""
     dish = max(1, int(dish))
-    petri_off = PETRI_STEPSIZE * 7
-    cam_off = CAMERA_STEPSIZE
+    petri_off = PETRI_OFFSET_PER_DISH
+    cam_off = CAMERA_OFFSET_PER_DISH
     if dish <= DISHES_PER_TRAY_ROW:
         step_05_prepare_imaging()
         skips = dish - 1
