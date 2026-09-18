@@ -8,7 +8,7 @@ PETRI_STEPSIZE = 116
 PETRI_DISH_PRE_UP = 690
 CAMERA_DISH_PRE_UP = 3850
 PETRI_DISH_PRE_UP_ROW2 = 1460
-CAMERA_DISH_PRE_UP_ROW2 = 3750
+CAMERA_DISH_PRE_UP_ROW2 = 3850
 
 # Between dishes in a tray row: undo the within-dish petri travel so the next
 # dish starts at the same PRE_UP height (do not use a fixed *7 from the old 8-row grid).
@@ -36,8 +36,11 @@ INCUBATION_TEMP_MIN = 20.0
 INCUBATION_TEMP_MAX = 55.0
 INCUBATION_TEMP_STEP = 1.0
 DEFAULT_ROUND_TEMPS = (37.0,) * NUM_STUDY_ROUNDS
-DEFAULT_ROUND_TIMES_MIN = (4.0,) * NUM_STUDY_ROUNDS
-DEFAULT_ROUND_ENABLED = (True,) + (False,) * (NUM_STUDY_ROUNDS - 1)
+# Round 1: 5 min; round 2: 6 h; rounds 3–50: 1 h each (all enabled).
+DEFAULT_ROUND_TIMES_MIN = (5.0, 6.0 * 60.0) + (60.0,) * (NUM_STUDY_ROUNDS - 2)
+DEFAULT_ROUND_ENABLED = (True,) * NUM_STUDY_ROUNDS
+# Show hr for round 2+ (times stored as minutes).
+DEFAULT_ROUND_TIME_HOURS = (False,) + (True,) * (NUM_STUDY_ROUNDS - 1)
 INCUBATION_MIN_STEP = 0.5
 INCUBATION_MIN_MIN = 0.5
 INCUBATION_MIN_MAX = 600.0

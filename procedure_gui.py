@@ -15,6 +15,7 @@ from tkinter import messagebox, scrolledtext
 from device_config import (
     DEFAULT_ROUND_ENABLED,
     DEFAULT_ROUND_TEMPS,
+    DEFAULT_ROUND_TIME_HOURS,
     DEFAULT_ROUND_TIMES_MIN,
     INCUBATION_HOUR_STEP,
     INCUBATION_MIN_MAX,
@@ -71,26 +72,28 @@ PRESET_FONT = ("Segoe UI", 8)
 SMALL_FONT = ("Segoe UI", 8)
 VALUE_FONT = ("Segoe UI", 10, "bold")
 BTN_RADIUS = 8
-LEFT_BTN_HEIGHT = int(round(44 * 1.25))
+LEFT_BTN_HEIGHT = 72
 LEFT_BTN_WIDTH_SCALE = 1.4
 LEFT_PANEL_MIN_WIDTH = 280
 CENTER_PANEL_WIDTH = 280
 RIGHT_PANEL_MIN_WIDTH = 280
-STUDY_BTN_HEIGHT = int(round(40 * 1.3))
+STUDY_BTN_HEIGHT = 56
 STUDY_BTN_MIN_WIDTH = 240
 STUDY_BTN_FONT = ("Segoe UI", 13, "bold")
 STUDY_BTN_RADIUS = 12
-ROUND_SCALE = round(0.52 * 0.9, 3)
+ROUND_SCALE = 0.62
 ROUND_ADJ_BTN_HEIGHT = int(round(80 * ROUND_SCALE))
 ROUND_ADJ_BTN_WIDTH = int(round(104 * ROUND_SCALE))
 ROUND_ADJ_BTN_FONT = ("Segoe UI", int(round(22 * ROUND_SCALE)), "bold")
 ROUND_ADJ_BTN_RADIUS = int(round(16 * ROUND_SCALE))
 ROUND_VALUE_FONT = ("Segoe UI", int(round(20 * ROUND_SCALE * 1.5)), "bold")
 ROUND_UNIT_FONT = ("Segoe UI", int(round(16 * ROUND_SCALE)))
-ROUND_BLOCK_PAD = 6
+ROUND_BLOCK_PAD = 12
 ROUND_BLOCK_RADIUS = 10
-ROUND_ROW_GAP = 4
+ROUND_ROW_GAP = 10
 ROUND_CONTROLS_SHIFT = 14
+ROUND_CTRL_GAP = 10
+ROUND_TEMP_TIME_GAP = 8
 ROUND_ON_INDICATOR = ("Segoe UI", 13)
 ROUND_BADGE_SIZE = int(round(56 * ROUND_SCALE * 2.2))
 ROUND_BADGE_GAP = int(round(20 * ROUND_SCALE))
@@ -116,7 +119,7 @@ PETRI_STEPPER_BTN_HEIGHT = 40
 PETRI_STEPPER_BTN_WIDTH = int(round(44 * 1.5))
 PETRI_STEPPER_BTN_FONT = ("Segoe UI", 12, "bold")
 PETRI_LABEL_FONT = ("Segoe UI", 10, "bold")
-LEFT_BTN_GAP = 8
+LEFT_BTN_GAP = 14
 CLOSE_BTN_BOTTOM_PAD = 8
 
 
@@ -144,7 +147,8 @@ class ProcedureGUI:
             tk.BooleanVar(value=DEFAULT_ROUND_ENABLED[i]) for i in range(NUM_STUDY_ROUNDS)
         ]
         self._round_time_hours = [
-            tk.BooleanVar(value=False) for _ in range(NUM_STUDY_ROUNDS)
+            tk.BooleanVar(value=DEFAULT_ROUND_TIME_HOURS[i])
+            for i in range(NUM_STUDY_ROUNDS)
         ]
         self._round_time_displays = [
             tk.StringVar(value=str(DEFAULT_ROUND_TIMES_MIN[i]))
@@ -296,7 +300,7 @@ class ProcedureGUI:
             radius=STUDY_BTN_RADIUS,
             stretch=True,
             min_width=STUDY_BTN_MIN_WIDTH,
-        ).pack(fill=tk.X, pady=(0, 6))
+        ).pack(fill=tk.X, pady=(0, 12))
 
         scroll_host = tk.Frame(right_outer, bg=PANEL)
         scroll_host.pack(fill=tk.BOTH, expand=True)
@@ -559,7 +563,7 @@ class ProcedureGUI:
         canvas = tk.Canvas(block_shell, bg=PANEL, highlightthickness=0, bd=0)
         canvas.pack(fill=tk.X)
 
-        block = tk.Frame(canvas, bg=PANEL, padx=ROUND_BLOCK_PAD, pady=4)
+        block = tk.Frame(canvas, bg=PANEL, padx=ROUND_BLOCK_PAD, pady=ROUND_BLOCK_PAD)
         block_shell._round_canvas = canvas
         block_shell._round_inner = block
         block_shell._round_bg = PANEL
@@ -607,9 +611,9 @@ class ProcedureGUI:
         block_shell.bind("<Configure>", _schedule_redraw)
 
         ctrl_box = tk.Frame(block, bg=PANEL)
-        ctrl_box.pack(fill=tk.X, pady=(2, 0))
+        ctrl_box.pack(fill=tk.X, pady=(4, 0))
 
-        gap = int(round(8 * ROUND_SCALE))
+        gap = ROUND_CTRL_GAP
         hours_var = self._round_time_hours[index]
         time_display = self._round_time_displays[index]
 
@@ -632,7 +636,7 @@ class ProcedureGUI:
             activeforeground=TEXT,
             font=ROUND_ON_INDICATOR,
             command=self._refresh_round_highlight,
-        ).pack(anchor="w", pady=(2, 0))
+        ).pack(anchor="w", pady=(2, 4))
         tk.Checkbutton(
             checks_col,
             text="",
@@ -644,7 +648,7 @@ class ProcedureGUI:
             activeforeground=TEXT,
             font=ROUND_ON_INDICATOR,
             command=lambda idx=index: self._toggle_time_unit(idx),
-        ).pack(anchor="w", pady=(2, 0))
+        ).pack(anchor="w", pady=(4, 2))
 
         controls_col = tk.Frame(round_row, bg=PANEL)
         controls_col.pack(
@@ -652,7 +656,7 @@ class ProcedureGUI:
         )
 
         trow = tk.Frame(controls_col, bg=PANEL)
-        trow.pack(anchor="center", pady=(0, 3))
+        trow.pack(anchor="center", pady=(0, ROUND_TEMP_TIME_GAP))
         self._round_temp_btn(trow, "−T", lambda v=temp_var: self._bump_temp(v, -1)).pack(
             side=tk.LEFT, padx=(0, gap)
         )
@@ -665,7 +669,7 @@ class ProcedureGUI:
         )
 
         mrow = tk.Frame(controls_col, bg=PANEL)
-        mrow.pack(anchor="center")
+        mrow.pack(anchor="center", pady=(ROUND_TEMP_TIME_GAP, 0))
         self._round_time_btn(
             mrow, "−t", lambda idx=index: self._bump_incub_time(idx, -1)
         ).pack(side=tk.LEFT, padx=(0, gap))
