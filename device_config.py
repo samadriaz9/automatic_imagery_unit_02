@@ -14,6 +14,11 @@ CAMERA_DISH_PRE_UP_ROW2 = 3750
 # dish starts at the same PRE_UP height (do not use a fixed *7 from the old 8-row grid).
 PETRI_OFFSET_PER_DISH = PETRI_STEPSIZE * (IMAGING_ROWS - 1)
 CAMERA_OFFSET_PER_DISH = CAMERA_STEPSIZE
+# After the between-dish camera DOWN, move back away from the limit (dishes 2–5).
+CAMERA_BETWEEN_DISH_AWAY_STEPS = 56
+
+# Mosaic: dish covers ~6.5 of 7 capture columns — drop half of the last column.
+MOSAIC_TRIM_HALF_LAST_COLUMN = True
 
 PETRI_TRAY_ROWS = 2
 PETRI_TRAY_COLS = 5

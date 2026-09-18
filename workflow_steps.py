@@ -12,6 +12,7 @@ from device_config import (
     CAMERA_DISH_PRE_UP,
     CAMERA_DISH_PRE_UP_ROW2,
     CAMERA_OFFSET_PER_DISH,
+    CAMERA_BETWEEN_DISH_AWAY_STEPS,
     CAMERA_STEPSIZE,
     DEFAULT_ROUND_ENABLED,
     DEFAULT_ROUND_TEMPS,
@@ -124,6 +125,7 @@ def _run_multi_petri_capture(num, capture_root, first_dish, last_dish):
         cols=IMAGING_COLS,
         camera_step_per_col=CAMERA_STEPSIZE,
         petri_step_per_row=PETRI_STEPSIZE,
+        camera_away_steps=CAMERA_BETWEEN_DISH_AWAY_STEPS,
         first_dish=first_dish,
         last_dish=last_dish,
     )
@@ -140,6 +142,7 @@ def _prepare_imaging_for_dish(dish):
     dish = max(1, int(dish))
     petri_off = PETRI_OFFSET_PER_DISH
     cam_off = CAMERA_OFFSET_PER_DISH
+    away_steps = CAMERA_BETWEEN_DISH_AWAY_STEPS
     if dish <= DISHES_PER_TRAY_ROW:
         step_05_prepare_imaging()
         skips = dish - 1
@@ -151,6 +154,8 @@ def _prepare_imaging_for_dish(dish):
             petri_dishes_down(petri_off)
         if cam_off > 0:
             Camera_down(cam_off)
+        if away_steps > 0:
+            Camera_up(away_steps)
 
 
 def _recover_from_camera_disconnect(on_tick=None, on_log=None):

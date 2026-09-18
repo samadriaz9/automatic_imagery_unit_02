@@ -25,11 +25,13 @@ from petri_dishes import petri_dishes_up
 from device_config import (
     CAMERA_DISH_PRE_UP_ROW2,
     CAMERA_STEPSIZE,
+    CAMERA_BETWEEN_DISH_AWAY_STEPS,
     CAPTURE_DISCARD_FRAMES,
     CAPTURE_FRAME_COUNT,
     CAPTURE_SETTLE_SECONDS,
     IMAGING_COLS,
     IMAGING_ROWS,
+    MOSAIC_TRIM_HALF_LAST_COLUMN,
     MOTION_SETTLE_SECONDS,
     PETRI_DISH_PRE_UP_ROW2,
     PETRI_STEPSIZE,
@@ -302,6 +304,36 @@ def _trim_mosaic(mosaic, crop_top_px=0, crop_right_px=0):
     return mosaic[ct:h, 0 : w - cr]
 
 
+def _trim_half_last_capture_column(
+    mosaic,
+    capture_rows,
+    capture_cols,
+    flip_y=True,
+    axis_swap=True,
+):
+    """
+    Drop half of the last capture column from the stitched mosaic.
+
+    With this rig's axis_swap + flip_y layout, capture column (cols-1) lands on the
+    top edge of the mosaic, so we crop half a tile height from the top.
+    """
+    if mosaic is None:
+        return mosaic
+    h, w = mosaic.shape[:2]
+    rows = max(1, int(capture_rows))
+    cols = max(1, int(capture_cols))
+    if bool(axis_swap):
+        tile_h = h // cols
+        half = max(1, tile_h // 2)
+        # Last capture column maps to mosaic row 0 when flip_y is enabled.
+        if bool(flip_y):
+            return _trim_mosaic(mosaic, crop_top_px=half, crop_right_px=0)
+        return mosaic[0 : h - half, :]
+    tile_w = w // cols
+    half = max(1, tile_w // 2)
+    return _trim_mosaic(mosaic, crop_top_px=0, crop_right_px=half)
+
+
 def _write_mosaic(output_dir, mosaic, mosaic_name):
     mosaic_path = os.path.join(output_dir, mosaic_name)
     ok = cv2.imwrite(mosaic_path, mosaic)
@@ -326,6 +358,7 @@ def start_imaging_capture_pattern(
     mosaic_center_fraction=1.0,
     mosaic_crop_top_px=0,
     mosaic_crop_right_px=0,
+    mosaic_trim_half_last_column=MOSAIC_TRIM_HALF_LAST_COLUMN,
     settle_seconds=CAPTURE_SETTLE_SECONDS,
     capture_frames=CAPTURE_FRAME_COUNT,
     discard_frames=CAPTURE_DISCARD_FRAMES,
@@ -467,6 +500,15 @@ def start_imaging_capture_pattern(
                 crop_top_px=int(mosaic_crop_top_px),
                 crop_right_px=int(mosaic_crop_right_px),
             )
+            if bool(mosaic_trim_half_last_column):
+                mosaic = _trim_half_last_capture_column(
+                    mosaic,
+                    capture_rows=int(rows),
+                    capture_cols=int(cols),
+                    flip_y=True,
+                    axis_swap=True,
+                )
+                print("[Imaging] Trimmed half of last capture column from mosaic")
             path = _write_mosaic(output_dir, mosaic, mosaic_name)
             print(f"[Imaging] Mosaic saved: {path}")
         return output_dir
@@ -497,6 +539,7 @@ def start_multi_petri_imaging(
     camera_step_per_col=CAMERA_STEPSIZE,
     petri_step_per_row=PETRI_STEPSIZE,
     settle_seconds=CAPTURE_SETTLE_SECONDS,
+    camera_away_steps=CAMERA_BETWEEN_DISH_AWAY_STEPS,
     first_dish=1,
     last_dish=None,
     **capture_kwargs,
@@ -541,6 +584,7 @@ def start_multi_petri_imaging(
         else row_step * max(0, int(rows) - 1)
     )
     cam_off = int(camera_offset_per_dish if camera_offset_per_dish is not None else col_step)
+    away_steps = max(0, int(camera_away_steps))
 
     if experiment_dir:
         exp_dir = _ensure_dir(experiment_dir)
@@ -589,12 +633,14 @@ def start_multi_petri_imaging(
             else:
                 print(
                     f"[Imaging] Next dish {dish}: petri DOWN {petri_off}, "
-                    f"camera DOWN {cam_off}"
+                    f"camera DOWN {cam_off}, then camera UP {away_steps} (away from limit)"
                 )
                 if petri_off > 0:
                     petri_dishes_down(petri_off)
                 if cam_off > 0:
                     Camera_down(cam_off)
+                if away_steps > 0:
+                    Camera_up(away_steps)
             time.sleep(MOTION_SETTLE_SECONDS)
 
         subdir = petri_dish_subdir(dish) if num > 1 else None
