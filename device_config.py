@@ -1,6 +1,6 @@
 """Shared hardware / imaging constants for main and GUI."""
 
-IMAGING_ROWS = 6
+IMAGING_ROWS = 7
 IMAGING_COLS = 7
 CAMERA_STEPSIZE = 112
 PETRI_STEPSIZE = 116
@@ -15,10 +15,12 @@ CAMERA_DISH_PRE_UP_ROW2 = 3750
 PETRI_OFFSET_PER_DISH = PETRI_STEPSIZE * (IMAGING_ROWS - 1)
 CAMERA_OFFSET_PER_DISH = CAMERA_STEPSIZE
 # After the between-dish camera DOWN, move back away from the limit (dishes 2–5).
-CAMERA_BETWEEN_DISH_AWAY_STEPS = 25
+CAMERA_BETWEEN_DISH_AWAY_STEPS = 30
 
-# Mosaic: dish covers ~6.5 of 7 capture columns — drop half of the last column.
+# Mosaic: dish covers ~6.5 of 7 columns and ~6.25 of 7 rows — trim the overflow
+# from the last capture column / last capture row after stitching.
 MOSAIC_TRIM_HALF_LAST_COLUMN = True
+MOSAIC_LAST_ROW_COVER_FRACTION = 0.25  # keep 0.25 of last row (6 + 0.25 = 6.25)
 
 PETRI_TRAY_ROWS = 2
 PETRI_TRAY_COLS = 5

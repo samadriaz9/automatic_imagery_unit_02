@@ -32,6 +32,7 @@ from device_config import (
     IMAGING_COLS,
     IMAGING_ROWS,
     MOSAIC_TRIM_HALF_LAST_COLUMN,
+    MOSAIC_LAST_ROW_COVER_FRACTION,
     MOTION_SETTLE_SECONDS,
     PETRI_DISH_PRE_UP_ROW2,
     PETRI_STEPSIZE,
@@ -320,7 +321,6 @@ def _trim_half_last_capture_column(
     if mosaic is None:
         return mosaic
     h, w = mosaic.shape[:2]
-    rows = max(1, int(capture_rows))
     cols = max(1, int(capture_cols))
     if bool(axis_swap):
         tile_h = h // cols
@@ -332,6 +332,40 @@ def _trim_half_last_capture_column(
     tile_w = w // cols
     half = max(1, tile_w // 2)
     return _trim_mosaic(mosaic, crop_top_px=0, crop_right_px=half)
+
+
+def _trim_last_capture_row(
+    mosaic,
+    capture_rows,
+    capture_cols,
+    keep_fraction=0.25,
+    flip_x=False,
+    axis_swap=True,
+):
+    """
+    Keep only ``keep_fraction`` of the last capture row in the stitched mosaic.
+
+    With axis_swap (no flip_x), capture row (rows-1) lands on the right edge, so we
+    crop from the right: remove (1 - keep_fraction) of one tile width.
+    """
+    if mosaic is None:
+        return mosaic
+    keep = float(keep_fraction)
+    if keep >= 1.0 - 1e-6:
+        return mosaic
+    if keep < 0.0:
+        raise ValueError("keep_fraction must be >= 0")
+    h, w = mosaic.shape[:2]
+    rows = max(1, int(capture_rows))
+    if bool(axis_swap):
+        tile_w = w // rows
+        trim = max(1, int(round(tile_w * (1.0 - keep))))
+        if bool(flip_x):
+            return mosaic[:, trim:w]
+        return _trim_mosaic(mosaic, crop_top_px=0, crop_right_px=trim)
+    tile_h = h // rows
+    trim = max(1, int(round(tile_h * (1.0 - keep))))
+    return mosaic[0 : h - trim, :]
 
 
 def _write_mosaic(output_dir, mosaic, mosaic_name):
@@ -359,6 +393,7 @@ def start_imaging_capture_pattern(
     mosaic_crop_top_px=0,
     mosaic_crop_right_px=0,
     mosaic_trim_half_last_column=MOSAIC_TRIM_HALF_LAST_COLUMN,
+    mosaic_last_row_cover_fraction=MOSAIC_LAST_ROW_COVER_FRACTION,
     settle_seconds=CAPTURE_SETTLE_SECONDS,
     capture_frames=CAPTURE_FRAME_COUNT,
     discard_frames=CAPTURE_DISCARD_FRAMES,
@@ -509,6 +544,19 @@ def start_imaging_capture_pattern(
                     axis_swap=True,
                 )
                 print("[Imaging] Trimmed half of last capture column from mosaic")
+            if float(mosaic_last_row_cover_fraction) < 1.0 - 1e-6:
+                mosaic = _trim_last_capture_row(
+                    mosaic,
+                    capture_rows=int(rows),
+                    capture_cols=int(cols),
+                    keep_fraction=float(mosaic_last_row_cover_fraction),
+                    flip_x=False,
+                    axis_swap=True,
+                )
+                print(
+                    f"[Imaging] Trimmed last capture row to "
+                    f"{float(mosaic_last_row_cover_fraction):.2f} of a tile"
+                )
             path = _write_mosaic(output_dir, mosaic, mosaic_name)
             print(f"[Imaging] Mosaic saved: {path}")
         return output_dir
