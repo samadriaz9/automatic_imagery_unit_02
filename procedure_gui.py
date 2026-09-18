@@ -74,11 +74,11 @@ BTN_RADIUS = 8
 LEFT_BTN_HEIGHT = int(round(40 * 1.3 * 1.3))  # left step buttons (height ×1.3 twice)
 LEFT_BTN_WIDTH_SCALE = 1.4
 LEFT_PANEL_MIN_WIDTH = int(round(180 * LEFT_BTN_WIDTH_SCALE))
-CENTER_PANEL_WIDTH = 400
-RIGHT_PANEL_MIN_WIDTH = 380
+CENTER_PANEL_WIDTH = 440
+RIGHT_PANEL_MIN_WIDTH = 300
 STUDY_BTN_HEIGHT = int(round(40 * 1.3 * 1.1))
-STUDY_BTN_MIN_WIDTH = int(round(140 * 2))
-STUDY_BTN_FONT = ("Segoe UI", 14, "bold")
+STUDY_BTN_MIN_WIDTH = 260
+STUDY_BTN_FONT = ("Segoe UI", 13, "bold")
 STUDY_BTN_RADIUS = 12
 ROUND_SCALE = round(0.52 * 0.9, 3)
 ROUND_ADJ_BTN_HEIGHT = int(round(80 * ROUND_SCALE))
@@ -208,8 +208,8 @@ class ProcedureGUI:
         outer = tk.Frame(self.root, bg=BG, padx=12, pady=10)
         outer.grid(row=0, column=0, sticky="nsew")
         outer.columnconfigure(0, minsize=LEFT_PANEL_MIN_WIDTH, weight=0)
-        outer.columnconfigure(1, weight=0)
-        outer.columnconfigure(2, minsize=RIGHT_PANEL_MIN_WIDTH, weight=1)
+        outer.columnconfigure(1, weight=1)
+        outer.columnconfigure(2, minsize=RIGHT_PANEL_MIN_WIDTH, weight=0)
         outer.rowconfigure(0, weight=1)
 
         # --- Left: steps (top) + Close (bottom) ---
@@ -248,9 +248,9 @@ class ProcedureGUI:
             stretch=True,
         ).pack(side=tk.BOTTOM, fill=tk.X, pady=(10, 0))
 
-        # --- Center (fixed width) ---
+        # --- Center (expands; status + log) ---
         center = tk.Frame(outer, bg=BG, padx=8, width=CENTER_PANEL_WIDTH)
-        center.grid(row=0, column=1, sticky="ns")
+        center.grid(row=0, column=1, sticky="nsew")
         center.grid_propagate(False)
         center.columnconfigure(0, weight=1)
         center.rowconfigure(3, weight=1)
@@ -274,11 +274,11 @@ class ProcedureGUI:
         )
         self._log.grid(row=3, column=0, sticky="nsew")
 
-        # --- Right: incubation + imaging rounds (wider column) ---
+        # --- Right: incubation + imaging rounds (fixed compact width) ---
         right_outer = tk.Frame(
-            outer, bg=PANEL, padx=10, pady=8, width=RIGHT_PANEL_MIN_WIDTH
+            outer, bg=PANEL, padx=8, pady=8, width=RIGHT_PANEL_MIN_WIDTH
         )
-        right_outer.grid(row=0, column=2, sticky="nsew")
+        right_outer.grid(row=0, column=2, sticky="ns")
         right_outer.grid_propagate(False)
         right_outer.columnconfigure(0, weight=1)
 
