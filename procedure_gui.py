@@ -17,6 +17,7 @@ from device_config import (
     DEFAULT_ROUND_TEMPS,
     DEFAULT_ROUND_TIME_HOURS,
     DEFAULT_ROUND_TIMES_MIN,
+    DISHES_PER_TRAY_ROW,
     INCUBATION_HOUR_STEP,
     INCUBATION_MIN_MAX,
     INCUBATION_MIN_MIN,
@@ -38,6 +39,7 @@ from workflow_steps import (
     step_03_shift_for_incubation,
     step_05_post_imaging_cleanup,
     step_05_prepare_imaging,
+    step_05_prepare_imaging_row2,
     step_06_sterilize,
 )
 
@@ -137,6 +139,7 @@ class ProcedureGUI:
         self._status_display = tk.StringVar(value="Idle")
 
         self._petri_count = tk.IntVar(value=10)
+        self._row2_only = tk.BooleanVar(value=False)
         self._round_temps = [
             tk.DoubleVar(value=DEFAULT_ROUND_TEMPS[i]) for i in range(NUM_STUDY_ROUNDS)
         ]
@@ -897,6 +900,18 @@ class ProcedureGUI:
             font=PETRI_STEPPER_BTN_FONT,
             min_width=PETRI_STEPPER_BTN_WIDTH,
         ).pack(side=tk.LEFT, padx=(4, 0))
+        tk.Checkbutton(
+            parent,
+            text=f"Row 2 only (dishes {DISHES_PER_TRAY_ROW + 1}–{MAX_PETRI_DISHES})",
+            variable=self._row2_only,
+            bg=PANEL,
+            fg=TEXT,
+            selectcolor=ROUND_ACTIVE,
+            activebackground=PANEL,
+            activeforeground=TEXT,
+            font=PETRI_LABEL_FONT,
+            anchor="w",
+        ).pack(fill=tk.X, pady=(4, 2))
 
     @staticmethod
     def _format_time_display(minutes, in_hours):
@@ -1080,13 +1095,28 @@ class ProcedureGUI:
 
     def _do_pictures(self):
         n = max(1, min(MAX_PETRI_DISHES, int(self._petri_count.get())))
-        self._log_msg(f"Take Pictures: {n} petri dish(es)")
-        step_05_prepare_imaging()
-        exp = capture_petri_dishes(
-            n,
-            on_tick=self._incubation_tick,
-            on_log=self._log_msg,
-        )
+        row2_only = bool(self._row2_only.get())
+        if row2_only:
+            first = DISHES_PER_TRAY_ROW + 1
+            last = MAX_PETRI_DISHES
+            n = MAX_PETRI_DISHES
+            self._log_msg(f"Take Pictures: dishes {first}–{last} only (row 2)")
+            step_05_prepare_imaging_row2()
+            exp = capture_petri_dishes(
+                n,
+                first_dish=first,
+                last_dish=last,
+                on_tick=self._incubation_tick,
+                on_log=self._log_msg,
+            )
+        else:
+            self._log_msg(f"Take Pictures: {n} petri dish(es)")
+            step_05_prepare_imaging()
+            exp = capture_petri_dishes(
+                n,
+                on_tick=self._incubation_tick,
+                on_log=self._log_msg,
+            )
         step_05_post_imaging_cleanup()
         self._log_msg(f"Saved: {exp}")
 

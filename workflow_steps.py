@@ -184,15 +184,18 @@ def capture_petri_dishes(
     on_tick=None,
     on_log=None,
     mid_row_incubation=False,
+    first_dish=None,
+    last_dish=None,
 ):
     """
     Power on camera if needed, run multi-petri capture, power off camera.
 
-    Default (Take Pictures): capture all dishes in one continuous flow. With 10
-    dishes, row 2 still homes then uses row-2 PRE_UP, but there is no pause.
+    Default (Take Pictures): capture dishes ``first_dish``..``last_dish`` (default
+    1..N) in one continuous flow. With 10 dishes, row 2 still homes then uses
+    row-2 PRE_UP, but there is no pause.
 
-    When ``mid_row_incubation`` is True and 10 dishes are selected (Incubation +
-    Imaging): row 1 (1–5) → all home → mid-row incubation → row 2 (6–10).
+    When ``mid_row_incubation`` is True and capturing both tray rows (Incubation +
+    Imaging with 10 dishes): row 1 (1–5) → all home → mid-row incubation → row 2.
 
     If the USB camera disconnects mid-capture: all home, incubate 5 min at 37 °C,
     then retry from the dish that failed.
@@ -202,6 +205,11 @@ def capture_petri_dishes(
     from main import ensure_usb_camera_ready, power_off_usb_camera
 
     num = max(1, min(MAX_PETRI_DISHES, int(num_petri_dishes)))
+    first = 1 if first_dish is None else int(first_dish)
+    last = num if last_dish is None else int(last_dish)
+    first = max(1, min(num, first))
+    last = max(first, min(num, last))
+
     if experiment_dir is None:
         experiment_dir = _next_exp_dir(data_root())
     capture_root = experiment_dir
@@ -209,24 +217,29 @@ def capture_petri_dishes(
         capture_root = os.path.join(experiment_dir, str(time_point_subdir))
         os.makedirs(capture_root, exist_ok=True)
 
+    row1_end = DISHES_PER_TRAY_ROW
+    row2_start = DISHES_PER_TRAY_ROW + 1
     split_rows = (
         bool(mid_row_incubation)
+        and first <= row1_end
+        and last >= row2_start
         and num == MAX_PETRI_DISHES
         and num == DISHES_PER_TRAY_ROW * 2
     )
-    row1_end = DISHES_PER_TRAY_ROW
-    row2_start = DISHES_PER_TRAY_ROW + 1
     recoveries = 0
-    resume_dish = 1
+    resume_dish = first
 
     def _capture_from(start_dish):
+        start = max(first, int(start_dish))
+        if start > last:
+            return
         if split_rows:
-            if start_dish <= row1_end:
+            if start <= row1_end:
                 print(
-                    f"[Imaging] Split capture: row 1 (dishes {start_dish}-{row1_end}), "
-                    f"mid incubation, row 2 (dishes {row2_start}-{num})"
+                    f"[Imaging] Split capture: row 1 (dishes {start}-{row1_end}), "
+                    f"mid incubation, row 2 (dishes {row2_start}-{last})"
                 )
-                _run_multi_petri_capture(num, capture_root, start_dish, row1_end)
+                _run_multi_petri_capture(num, capture_root, start, min(row1_end, last))
                 print("[Imaging] Row 1 complete — all home before mid-row incubation")
                 step_01_all_home()
                 print(
@@ -240,11 +253,11 @@ def capture_petri_dishes(
                     heater_pins=(UPPER_HEATER_PIN,),
                 )
                 step_05_prepare_imaging_row2()
-                _run_multi_petri_capture(num, capture_root, row2_start, num)
+                _run_multi_petri_capture(num, capture_root, row2_start, last)
             else:
-                _run_multi_petri_capture(num, capture_root, start_dish, num)
+                _run_multi_petri_capture(num, capture_root, start, last)
         else:
-            _run_multi_petri_capture(num, capture_root, start_dish, num)
+            _run_multi_petri_capture(num, capture_root, start, last)
 
     try:
         while True:
