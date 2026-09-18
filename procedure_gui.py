@@ -65,19 +65,19 @@ MUTED = "#9aa5b8"
 WARN = "#e8a87c"
 CLOSE_BTN = "#b85450"
 BTN_FONT = ("Segoe UI", 11, "bold")
-LEFT_BTN_FONT = ("Segoe UI", int(round(11 * 1.5)), "bold")
+LEFT_BTN_FONT = ("Segoe UI", int(round(12 * 1.35)), "bold")
 ADJ_FONT = ("Segoe UI", 10, "bold")
 PRESET_FONT = ("Segoe UI", 8)
 SMALL_FONT = ("Segoe UI", 8)
 VALUE_FONT = ("Segoe UI", 10, "bold")
 BTN_RADIUS = 8
-LEFT_BTN_HEIGHT = int(round(40 * 1.3 * 1.3))  # left step buttons (height ×1.3 twice)
+LEFT_BTN_HEIGHT = int(round(44 * 1.25))
 LEFT_BTN_WIDTH_SCALE = 1.4
-LEFT_PANEL_MIN_WIDTH = int(round(180 * LEFT_BTN_WIDTH_SCALE))
-CENTER_PANEL_WIDTH = 440
-RIGHT_PANEL_MIN_WIDTH = 300
-STUDY_BTN_HEIGHT = int(round(40 * 1.3 * 1.1))
-STUDY_BTN_MIN_WIDTH = 260
+LEFT_PANEL_MIN_WIDTH = 280
+CENTER_PANEL_WIDTH = 280
+RIGHT_PANEL_MIN_WIDTH = 280
+STUDY_BTN_HEIGHT = int(round(40 * 1.3))
+STUDY_BTN_MIN_WIDTH = 240
 STUDY_BTN_FONT = ("Segoe UI", 13, "bold")
 STUDY_BTN_RADIUS = 12
 ROUND_SCALE = round(0.52 * 0.9, 3)
@@ -89,7 +89,7 @@ ROUND_VALUE_FONT = ("Segoe UI", int(round(20 * ROUND_SCALE * 1.5)), "bold")
 ROUND_UNIT_FONT = ("Segoe UI", int(round(16 * ROUND_SCALE)))
 ROUND_BLOCK_PAD = 6
 ROUND_BLOCK_RADIUS = 10
-ROUND_ROW_GAP = 5
+ROUND_ROW_GAP = 4
 ROUND_CONTROLS_SHIFT = 14
 ROUND_ON_INDICATOR = ("Segoe UI", 13)
 ROUND_BADGE_SIZE = int(round(56 * ROUND_SCALE * 2.2))
@@ -112,11 +112,12 @@ ROUND_TIME_BTN_COLOR = "#d35400"
 ROUND_TIME_BTN_HOVER = "#e67e22"
 MAIN_BTN_HEIGHT = 40
 SMALL_BTN_HEIGHT = 26
-PETRI_STEPPER_BTN_HEIGHT = 38
+PETRI_STEPPER_BTN_HEIGHT = 40
 PETRI_STEPPER_BTN_WIDTH = int(round(44 * 1.5))
 PETRI_STEPPER_BTN_FONT = ("Segoe UI", 12, "bold")
 PETRI_LABEL_FONT = ("Segoe UI", 10, "bold")
-LEFT_BTN_GAP = 4
+LEFT_BTN_GAP = 8
+CLOSE_BTN_BOTTOM_PAD = 8
 
 
 class ProcedureGUI:
@@ -207,18 +208,20 @@ class ProcedureGUI:
 
         outer = tk.Frame(self.root, bg=BG, padx=12, pady=10)
         outer.grid(row=0, column=0, sticky="nsew")
-        outer.columnconfigure(0, minsize=LEFT_PANEL_MIN_WIDTH, weight=0)
-        outer.columnconfigure(1, weight=1)
-        outer.columnconfigure(2, minsize=RIGHT_PANEL_MIN_WIDTH, weight=0)
+        # Equal left / center / right columns
+        outer.columnconfigure(0, weight=1, uniform="thirds")
+        outer.columnconfigure(1, weight=1, uniform="thirds")
+        outer.columnconfigure(2, weight=1, uniform="thirds")
         outer.rowconfigure(0, weight=1)
 
-        # --- Left: steps (top) + Close (bottom) ---
-        left = tk.Frame(outer, bg=PANEL, padx=10, pady=10, width=LEFT_PANEL_MIN_WIDTH)
-        left.grid(row=0, column=0, sticky="nsew")
-        left.grid_propagate(False)
+        # --- Left: steps (top) + Close fixed at bottom of screen column ---
+        left = tk.Frame(outer, bg=PANEL, padx=10, pady=10)
+        left.grid(row=0, column=0, sticky="nsew", padx=(0, 6))
+        left.rowconfigure(0, weight=1)
+        left.columnconfigure(0, weight=1)
 
         left_steps = tk.Frame(left, bg=PANEL)
-        left_steps.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+        left_steps.grid(row=0, column=0, sticky="nsew")
 
         for label, fn in [
             ("All Home", step_01_all_home),
@@ -236,8 +239,10 @@ class ProcedureGUI:
         ]:
             self._mk_left_btn(left_steps, label, fn).pack(fill=tk.X, pady=LEFT_BTN_GAP)
 
+        close_wrap = tk.Frame(left, bg=PANEL)
+        close_wrap.grid(row=1, column=0, sticky="ew", pady=(CLOSE_BTN_BOTTOM_PAD, 0))
         self._mk_round_btn(
-            left,
+            close_wrap,
             "Close",
             self._on_close,
             color=CLOSE_BTN,
@@ -246,12 +251,11 @@ class ProcedureGUI:
             height=LEFT_BTN_HEIGHT,
             font=LEFT_BTN_FONT,
             stretch=True,
-        ).pack(side=tk.BOTTOM, fill=tk.X, pady=(10, 0))
+        ).pack(fill=tk.X)
 
-        # --- Center (expands; status + log) ---
-        center = tk.Frame(outer, bg=BG, padx=8, width=CENTER_PANEL_WIDTH)
-        center.grid(row=0, column=1, sticky="nsew")
-        center.grid_propagate(False)
+        # --- Center (status + log) ---
+        center = tk.Frame(outer, bg=BG, padx=8)
+        center.grid(row=0, column=1, sticky="nsew", padx=6)
         center.columnconfigure(0, weight=1)
         center.rowconfigure(3, weight=1)
 
@@ -274,13 +278,11 @@ class ProcedureGUI:
         )
         self._log.grid(row=3, column=0, sticky="nsew")
 
-        # --- Right: incubation + imaging rounds (fixed compact width) ---
-        right_outer = tk.Frame(
-            outer, bg=PANEL, padx=8, pady=8, width=RIGHT_PANEL_MIN_WIDTH
-        )
-        right_outer.grid(row=0, column=2, sticky="ns")
-        right_outer.grid_propagate(False)
+        # --- Right: incubation + imaging rounds ---
+        right_outer = tk.Frame(outer, bg=PANEL, padx=8, pady=8)
+        right_outer.grid(row=0, column=2, sticky="nsew", padx=(6, 0))
         right_outer.columnconfigure(0, weight=1)
+        right_outer.rowconfigure(1, weight=1)
 
         self._mk_round_btn(
             right_outer,
