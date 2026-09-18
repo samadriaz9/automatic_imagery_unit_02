@@ -285,7 +285,8 @@ def run_timed_picture_study(
     """
     Incubate for each interval, then capture all petri dishes.
 
-    Folders: ``data/exp_XX/03min/``, ``data/exp_XX/06min/`` (cumulative minutes).
+    Folders: ``data/exp_XX/R1_15_minutes/``, ``data/exp_XX/R2_439_minutes/``
+    (round number + cumulative incubation minutes).
 
     ``interval_minutes``: minutes per round (first ``num_rounds`` used, max ``NUM_STUDY_ROUNDS``).
 
@@ -310,7 +311,7 @@ def run_timed_picture_study(
     for rnd in range(1, num_rounds + 1):
         mins = float(intervals[rnd - 1])
         cumulative += mins
-        label = f"{int(round(cumulative)):02d}min"
+        label = f"R{rnd}_{int(round(cumulative))}_minutes"
         _log(f"Round {rnd}/{num_rounds}: incubate {mins:g} min → capture → {label}/")
 
         Start_incubation(float(target_c), mins, on_tick=on_tick)
@@ -341,8 +342,7 @@ def run_incubation_imaging_study(
     """
     For each enabled round: incubate at round temp/time, then capture petri dishes.
 
-    Images are saved under ``data/exp_XX/{MM}min/`` using that round's time (minutes).
-    Duplicate folder names get a ``_rN`` suffix.
+    Images are saved under ``data/exp_XX/R{N}_{cumulative}_minutes/``.
     """
     temps = [float(t) for t in round_temps[:NUM_STUDY_ROUNDS]]
     times = [float(t) for t in round_times_min[:NUM_STUDY_ROUNDS]]
@@ -367,14 +367,13 @@ def run_incubation_imaging_study(
     active = [i + 1 for i in range(NUM_STUDY_ROUNDS) if enabled[i]]
     _log(f"Incubation + imaging: {len(active)} round(s), petri={num_petri_dishes}")
 
+    cumulative = 0.0
     try:
         for idx, rnd in enumerate(active):
             temp = temps[rnd - 1]
             mins = times[rnd - 1]
-            label = f"{int(round(mins)):02d}min"
-            subdir = label
-            if os.path.exists(os.path.join(exp_dir, subdir)):
-                subdir = f"{label}_r{rnd}"
+            cumulative += mins
+            subdir = f"R{rnd}_{int(round(cumulative))}_minutes"
 
             is_final_round = idx == len(active) - 1
             _log(f"  Round {rnd}: {temp:g}°C, {mins:g} min → capture → {subdir}/")
