@@ -7,7 +7,7 @@ PETRI_STEPSIZE = 116
 
 PETRI_DISH_PRE_UP = 690
 CAMERA_DISH_PRE_UP = 3850
-PETRI_DISH_PRE_UP_ROW2 = 1560
+PETRI_DISH_PRE_UP_ROW2 = 1600
 CAMERA_DISH_PRE_UP_ROW2 = 3850
 
 # Between dishes in a tray row: undo the within-dish petri travel so the next
