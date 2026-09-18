@@ -15,7 +15,7 @@ CAMERA_DISH_PRE_UP_ROW2 = 3750
 PETRI_OFFSET_PER_DISH = PETRI_STEPSIZE * (IMAGING_ROWS - 1)
 CAMERA_OFFSET_PER_DISH = CAMERA_STEPSIZE
 # After the between-dish camera DOWN, move back away from the limit (dishes 2–5).
-CAMERA_BETWEEN_DISH_AWAY_STEPS = 40
+CAMERA_BETWEEN_DISH_AWAY_STEPS = 20
 
 # Mosaic: dish covers ~6.5 of 7 columns and ~6.25 of 7 rows — trim the overflow
 # from the last capture column / last capture row after stitching.
