@@ -404,6 +404,7 @@ def run_incubation_imaging_study(
                 time_point_subdir=subdir,
                 on_tick=on_tick,
                 on_log=on_log,
+                mid_row_incubation=True,
             )
             release_incubation_heaters()
 
