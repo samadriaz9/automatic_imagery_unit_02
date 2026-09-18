@@ -7,7 +7,7 @@ PETRI_STEPSIZE = 116
 
 PETRI_DISH_PRE_UP = 690
 CAMERA_DISH_PRE_UP = 3850
-PETRI_DISH_PRE_UP_ROW2 = 1460
+PETRI_DISH_PRE_UP_ROW2 = 1560
 CAMERA_DISH_PRE_UP_ROW2 = 3850
 
 # Between dishes in a tray row: undo the within-dish petri travel so the next
@@ -46,9 +46,10 @@ INCUBATION_MIN_MIN = 0.5
 INCUBATION_MIN_MAX = 600.0
 INCUBATION_HOUR_STEP = 0.25
 
-# Split imaging (10 dishes): row-1 capture → home → mid incubation → row-2 capture
+# Split imaging (10 dishes, Incubation + Imaging only):
+# row-1 capture → home → mid incubation → row-2 capture
 MID_ROW_IMAGING_TEMP_C = 37.0
-MID_ROW_IMAGING_MIN = 4.0
+MID_ROW_IMAGING_MIN = 5.0
 DISHES_PER_TRAY_ROW = PETRI_TRAY_COLS
 
 # USB capture: short settle + flush stale frames before save

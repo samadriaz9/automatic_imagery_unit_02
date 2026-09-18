@@ -183,12 +183,16 @@ def capture_petri_dishes(
     time_point_subdir=None,
     on_tick=None,
     on_log=None,
+    mid_row_incubation=False,
 ):
     """
     Power on camera if needed, run multi-petri capture, power off camera.
 
-    With 10 dishes: row 1 (dishes 1–5) → all home → 4 min upper-only incubation
-    at 37 °C → row 2 (dishes 6–10). All images go to the same experiment folder.
+    Default (Take Pictures): capture all dishes in one continuous flow. With 10
+    dishes, row 2 still homes then uses row-2 PRE_UP, but there is no pause.
+
+    When ``mid_row_incubation`` is True and 10 dishes are selected (Incubation +
+    Imaging): row 1 (1–5) → all home → mid-row incubation → row 2 (6–10).
 
     If the USB camera disconnects mid-capture: all home, incubate 5 min at 37 °C,
     then retry from the dish that failed.
@@ -205,7 +209,11 @@ def capture_petri_dishes(
         capture_root = os.path.join(experiment_dir, str(time_point_subdir))
         os.makedirs(capture_root, exist_ok=True)
 
-    split_rows = num == MAX_PETRI_DISHES and num == DISHES_PER_TRAY_ROW * 2
+    split_rows = (
+        bool(mid_row_incubation)
+        and num == MAX_PETRI_DISHES
+        and num == DISHES_PER_TRAY_ROW * 2
+    )
     row1_end = DISHES_PER_TRAY_ROW
     row2_start = DISHES_PER_TRAY_ROW + 1
     recoveries = 0
