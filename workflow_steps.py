@@ -408,7 +408,7 @@ def run_incubation_imaging_study(
                 temp,
                 mins,
                 on_tick=on_tick,
-                keep_upper_heater_on_exit=not is_final_round,
+                keep_upper_heater_on_exit=False,
             )
             step_05_prepare_imaging()
             capture_petri_dishes(

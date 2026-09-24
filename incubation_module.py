@@ -11,8 +11,12 @@ except Exception:
 LOWER_HEATER_PIN = 12  # BCM 12, physical pin 32
 UPPER_HEATER_PIN = 26  # BCM 26, physical pin 37
 UPPER_HEATER_DUTY_BOOST = 1.30  # upper runs 30% hotter than lower (same PID base)
-LOWER_HEATER_OFF_REMAINING_MIN = 4.0  # last N min: lower off, upper only until incubation ends
-# Once sample is this many °C below target, lower stays off (upper finishes ramp / hold).
+# Last N minutes of a long hold: both heaters OFF so dishes cool before imaging
+# (avoids condensation). Holds ≤ this length heat fully, then add this cool-down.
+PRE_IMAGING_COOL_DOWN_MIN = 5.0
+# Legacy alias used by older call sites / docs.
+LOWER_HEATER_OFF_REMAINING_MIN = PRE_IMAGING_COOL_DOWN_MIN
+# Once sample is this many °C below target, lower stays off (upper finishes ramp).
 # Example: target 37 °C → lower off from 34 °C onward to reduce lid vapour.
 LOWER_HEATER_OFF_BELOW_TARGET_C = 3.0
 HEATER_DUTY_SCALE = {
@@ -155,6 +159,7 @@ def Start_incubation(
     ramp_delay=0.1,
     lower_off_remaining_min=None,
     lower_off_below_target_c=None,
+    pre_imaging_cool_down_min=None,
     keep_upper_heater_on_exit=False,
 ):
     """
@@ -163,14 +168,17 @@ def Start_incubation(
     Both heaters use the same DS18B20 reading and PID output. The upper heater
     (GPIO 26 / pin 37) receives 30% more duty than the lower (GPIO 12 / pin 32).
 
-    Lower heater is switched off (upper only) when either:
-    - temperature reaches ``target - lower_off_below_target_c`` (default 3 °C),
-      then stays off for the rest of this incubation to reduce lid vapour; or
-    - the last ``lower_off_remaining_min`` minutes of the hold.
+    Lower heater is switched off (upper only) when temperature reaches
+    ``target - lower_off_below_target_c`` (default 3 °C), to reduce lid vapour.
+
+    Before imaging, both heaters turn off for a cool-down so dishes match ambient
+    and condensation is reduced:
+    - holds longer than the cool-down: last N minutes both off (within the hold);
+    - shorter holds: heat for the full duration, then add N minutes with heaters off.
 
     If ``keep_upper_heater_on_exit`` is True, the upper heater stays on at the
-    last PID duty after incubation (for imaging). Call ``release_incubation_heaters()``
-    when heating should stop.
+    last PID duty after incubation. Prefer leaving this False when imaging follows
+    so dishes can cool. Call ``release_incubation_heaters()`` when heating should stop.
 
     Args:
         target_temp_c: target temperature in Celsius.
@@ -183,9 +191,11 @@ def Start_incubation(
         max_duty: safety cap per heater duty cycle (%).
         ramp_step/ramp_delay: soft-ramp behavior to reduce thermal overshoot.
         poll_seconds: sensor polling interval.
-        lower_off_remaining_min: minutes before end to disable lower heater (default 4).
+        lower_off_remaining_min: legacy alias for ``pre_imaging_cool_down_min``.
         lower_off_below_target_c: turn lower off once temp >= target minus this
             (default 3). Set 0 or less to disable the temperature cutoff.
+        pre_imaging_cool_down_min: both heaters off for this many minutes before
+            return / imaging (default 5).
         keep_upper_heater_on_exit: keep upper heater PWM on after incubation ends.
         on_tick: optional callback(elapsed_s, remaining_s, temp_c, target_temp_c).
     """
@@ -195,9 +205,19 @@ def Start_incubation(
     duration_s = max(0.0, float(duration_minutes) * 60.0)
     poll_seconds = max(0.2, float(poll_seconds))
     max_duty = max(1.0, min(100.0, float(max_duty)))
-    if lower_off_remaining_min is None:
-        lower_off_remaining_min = LOWER_HEATER_OFF_REMAINING_MIN
-    lower_off_remaining_s = max(0.0, float(lower_off_remaining_min) * 60.0)
+    if pre_imaging_cool_down_min is None:
+        if lower_off_remaining_min is not None:
+            pre_imaging_cool_down_min = lower_off_remaining_min
+        else:
+            pre_imaging_cool_down_min = PRE_IMAGING_COOL_DOWN_MIN
+    cool_down_s = max(0.0, float(pre_imaging_cool_down_min) * 60.0)
+    # Long holds: cool inside the scheduled window. Short holds: heat fully, then add cool.
+    if duration_s > cool_down_s > 0:
+        heat_duration_s = duration_s - cool_down_s
+        append_cool_down = False
+    else:
+        heat_duration_s = duration_s
+        append_cool_down = cool_down_s > 0
     if lower_off_below_target_c is None:
         lower_off_below_target_c = LOWER_HEATER_OFF_BELOW_TARGET_C
     lower_off_below_target_c = float(lower_off_below_target_c)
@@ -220,11 +240,21 @@ def Start_incubation(
     scale_desc = ", ".join(
         f"GPIO{p}×{scale_map.get(p, 1.0):g}" for p in heater_pins
     )
+    cool_desc = (
+        f"both heaters OFF last {pre_imaging_cool_down_min:g} min (cool before imaging)"
+        if duration_s > cool_down_s > 0
+        else (
+            f"heat full hold, then {pre_imaging_cool_down_min:g} min cool-down "
+            f"(both heaters OFF) before imaging"
+            if cool_down_s > 0
+            else "no pre-imaging cool-down"
+        )
+    )
     cutoff_desc = (
         f"lower off at temp>={lower_off_threshold_c:.1f}C "
-        f"(target-{lower_off_below_target_c:g}) or <= {lower_off_remaining_min:g} min remain"
+        f"(target-{lower_off_below_target_c:g}); {cool_desc}"
         if use_temp_cutoff
-        else f"lower off when <= {lower_off_remaining_min:g} min remain"
+        else cool_desc
     )
     print(
         f"[Incubation] Heater PWM pins={heater_pins}, duty scale: {scale_desc}, "
@@ -238,7 +268,7 @@ def Start_incubation(
     i_term = 0.0
     prev_error = 0.0
     current_duty = 0.0
-    lower_cutoff_logged = False
+    cool_logged = False
     lower_off_near_target = False
     if PID is not None:
         pid = PID(float(kp), float(ki), float(kd), setpoint=target_temp_c)
@@ -249,16 +279,61 @@ def Start_incubation(
             pass
 
     start = time.time()
+    if duration_s > cool_down_s > 0:
+        total_planned_s = duration_s
+    elif append_cool_down:
+        total_planned_s = heat_duration_s + cool_down_s
+    else:
+        total_planned_s = heat_duration_s
 
     def _notify_tick(temp_c):
         if on_tick is None:
             return
         elapsed = time.time() - start
-        remaining = max(0.0, duration_s - elapsed)
+        remaining = max(0.0, total_planned_s - elapsed)
         try:
             on_tick(elapsed, remaining, temp_c, target_temp_c)
         except Exception:
             pass
+
+    def _force_heaters_off():
+        nonlocal current_duty
+        current_duty = _set_heaters_duty_smooth(
+            heater_channels,
+            current_base=current_duty,
+            target_base=0.0,
+            max_duty=max_duty,
+            ramp_step=ramp_step,
+            ramp_delay=ramp_delay,
+            lower_active=False,
+        )
+        _apply_heater_duties(heater_channels, 0.0, max_duty, lower_active=False)
+
+    def _run_cool_down(seconds):
+        nonlocal cool_logged
+        if seconds <= 0:
+            return
+        if not cool_logged:
+            print(
+                f"[Incubation] Pre-imaging cool-down {seconds / 60.0:g} min — "
+                "both heaters OFF so dishes cool (reduce condensation)"
+            )
+            cool_logged = True
+        _force_heaters_off()
+        cool_start = time.time()
+        while (time.time() - cool_start) < seconds:
+            try:
+                temp_c = _read_ds18b20_c()
+            except RuntimeError as exc:
+                print(f"[Incubation] Cool-down sensor read failed: {exc}")
+                temp_c = float("nan")
+            print(
+                f"[Incubation] cool {temp_c:.2f}C -> heaters OFF "
+                f"({_format_heater_duties(heater_channels)})"
+            )
+            _notify_tick(temp_c)
+            time.sleep(poll_seconds)
+        _force_heaters_off()
 
     try:
         try:
@@ -267,11 +342,9 @@ def Start_incubation(
             print(f"[Incubation] Initial sensor read failed: {exc}")
             _notify_tick(float("nan"))
 
-        while (time.time() - start) < duration_s:
+        heat_start = time.time()
+        while (time.time() - heat_start) < heat_duration_s:
             temp_c = _read_ds18b20_c()
-            remaining = max(0.0, duration_s - (time.time() - start))
-            use_lower_cutoff = duration_s > lower_off_remaining_s
-            lower_active_time = remaining > lower_off_remaining_s if use_lower_cutoff else True
             if use_temp_cutoff and (lower_off_near_target or temp_c >= lower_off_threshold_c):
                 if not lower_off_near_target:
                     print(
@@ -280,16 +353,9 @@ def Start_incubation(
                         "lower heater OFF, upper only to reduce lid vapour"
                     )
                     lower_off_near_target = True
-                lower_active_temp = False
+                lower_active = False
             else:
-                lower_active_temp = True
-            lower_active = lower_active_time and lower_active_temp
-            if not lower_active_time and not lower_cutoff_logged:
-                print(
-                    f"[Incubation] <= {lower_off_remaining_min:g} min remaining — "
-                    "lower heater OFF, upper only until incubation ends"
-                )
-                lower_cutoff_logged = True
+                lower_active = True
 
             if pid is not None:
                 requested_duty = float(pid(temp_c))
@@ -316,6 +382,12 @@ def Start_incubation(
             )
             _notify_tick(temp_c)
             time.sleep(poll_seconds)
+
+        # Cool-down: both heaters off before imaging / return.
+        if duration_s > cool_down_s > 0:
+            _run_cool_down(cool_down_s)
+        elif append_cool_down:
+            _run_cool_down(cool_down_s)
     finally:
         global _held_upper_channels
         if keep_upper_heater_on_exit:
