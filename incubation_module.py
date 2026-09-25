@@ -8,8 +8,8 @@ except Exception:
     PID = None
 
 
-LOWER_HEATER_PIN = 12  # BCM 12, physical pin 32
-UPPER_HEATER_PIN = 26  # BCM 26, physical pin 37
+LOWER_HEATER_PIN = 26  # BCM 26, physical pin 37
+UPPER_HEATER_PIN = 12  # BCM 12, physical pin 32
 UPPER_HEATER_DUTY_BOOST = 1.30  # upper runs 30% hotter than lower (same PID base)
 # Last N minutes of a long hold: both heaters OFF so dishes cool before imaging
 # (avoids condensation). Holds ≤ this length heat fully, then add this cool-down.
