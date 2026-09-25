@@ -30,7 +30,7 @@ from device_config import (
     STEP_INCUBATION_MINUTES,
     STEP_INCUBATION_TEMP_C,
 )
-from incubation_module import Start_incubation
+from incubation_module import Start_incubation, release_incubation_heaters, test_upper_heater
 from workflow_steps import (
     capture_petri_dishes,
     run_incubation_imaging_study,
@@ -235,6 +235,7 @@ class ProcedureGUI:
             ("Insert Petri Dishes", step_02_insert_petri_dishes),
             ("Shift for Incubation", step_03_shift_for_incubation),
             ("Start Incubation", None),
+            ("Test Upper Heater", None),
         ]:
             self._mk_left_btn(left_steps, label, fn).pack(fill=tk.X, pady=LEFT_BTN_GAP)
 
@@ -1010,6 +1011,9 @@ class ProcedureGUI:
                 if title == "Start Incubation":
                     self._do_incubation()
                     self._log_msg(f"Done: {title}")
+                elif title == "Test Upper Heater":
+                    self._do_test_upper_heater()
+                    self._log_msg(f"Done: {title}")
                 elif title == "Take Pictures":
                     self._do_pictures()
                     self._log_msg(f"Done: {title}")
@@ -1092,6 +1096,10 @@ class ProcedureGUI:
             self._log_msg("Warning: UI did not update before incubation start")
 
         Start_incubation(target, minutes, on_tick=self._incubation_tick)
+
+    def _do_test_upper_heater(self):
+        self._log_msg("Test Upper Heater: 50% for 5 min (upper only)")
+        test_upper_heater(on_tick=self._incubation_tick)
 
     def _do_pictures(self):
         n = max(1, min(MAX_PETRI_DISHES, int(self._petri_count.get())))
@@ -1186,10 +1194,14 @@ class ProcedureGUI:
         if self._busy:
             if not messagebox.askyesno(
                 "Busy",
-                "A step is running. Close anyway?\nGPIO will be released.",
+                "A step is running. Close anyway?\nHeaters and GPIO will be released.",
             ):
                 return
-        self._log_msg("Closing: releasing GPIO...")
+        self._log_msg("Closing: heaters OFF, releasing GPIO...")
+        try:
+            release_incubation_heaters()
+        except Exception as exc:
+            self._log_msg(f"Heater cleanup warning: {exc}")
         try:
             shutdown_all()
         except Exception as exc:

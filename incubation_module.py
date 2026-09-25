@@ -16,6 +16,10 @@ UPPER_HEATER_DUTY_BOOST = 1.30  # upper runs 30% hotter than lower (same PID bas
 PRE_IMAGING_COOL_DOWN_MIN = 5.0
 # Legacy alias used by older call sites / docs.
 LOWER_HEATER_OFF_REMAINING_MIN = PRE_IMAGING_COOL_DOWN_MIN
+# Manual upper-heater self-test (GUI button).
+UPPER_HEATER_TEST_DUTY = 50.0
+UPPER_HEATER_TEST_MINUTES = 5.0
+UPPER_HEATER_TEST_PWM_FREQ = 100
 # Once sample is this many °C below target, lower stays off (upper finishes ramp).
 # Example: target 37 °C → lower off from 34 °C onward to reduce lid vapour.
 LOWER_HEATER_OFF_BELOW_TARGET_C = 3.0
@@ -28,6 +32,8 @@ DEFAULT_HEATER_PINS = (LOWER_HEATER_PIN, UPPER_HEATER_PIN)
 RPWM_PIN = LOWER_HEATER_PIN
 
 _held_upper_channels = []
+_test_heater_channels = []
+_heater_test_stop = False
 
 
 def _stop_channel(ch):
@@ -38,9 +44,22 @@ def _stop_channel(ch):
         pass
 
 
+def stop_heater_test():
+    """Force-stop any running heater self-test and release its PWM."""
+    global _heater_test_stop, _test_heater_channels
+    _heater_test_stop = True
+    if not _test_heater_channels:
+        return
+    for ch in list(_test_heater_channels):
+        _stop_channel(ch)
+    _test_heater_channels = []
+    print("[Incubation] Heater test stopped — upper heater OFF.")
+
+
 def release_incubation_heaters():
-    """Turn off any upper heater left running after incubation (e.g. between study rounds)."""
+    """Turn off held upper heater and any heater self-test outputs."""
     global _held_upper_channels
+    stop_heater_test()
     if not _held_upper_channels:
         return
     for ch in list(_held_upper_channels):
@@ -417,5 +436,75 @@ def keep_temperature_pid(temperature_to_keep_c, minutes, **kwargs):
         keep_temperature_pid(37.0, 60)  # keep 37C for 60 minutes
     """
     return Start_incubation(temperature_to_keep_c, minutes, **kwargs)
+
+
+def test_upper_heater(
+    duty_percent=None,
+    duration_minutes=None,
+    pwm_freq=None,
+    on_tick=None,
+    poll_seconds=2.0,
+):
+    """
+    Switch on the upper heater only at a fixed duty for a short self-test.
+
+    Default: 50% for 5 minutes. Lower heater stays off. Call ``stop_heater_test()``
+    or ``release_incubation_heaters()`` to abort early (e.g. GUI Close).
+    """
+    global _heater_test_stop, _test_heater_channels
+
+    if duty_percent is None:
+        duty_percent = UPPER_HEATER_TEST_DUTY
+    if duration_minutes is None:
+        duration_minutes = UPPER_HEATER_TEST_MINUTES
+    if pwm_freq is None:
+        pwm_freq = UPPER_HEATER_TEST_PWM_FREQ
+
+    duty = max(0.0, min(100.0, float(duty_percent)))
+    duration_s = max(0.0, float(duration_minutes) * 60.0)
+    poll_seconds = max(0.2, float(poll_seconds))
+
+    stop_heater_test()
+    release_incubation_heaters()
+    _heater_test_stop = False
+
+    print(
+        f"[Incubation] Upper heater TEST: {duty:.0f}% for {duration_minutes:g} min "
+        f"(GPIO {UPPER_HEATER_PIN})"
+    )
+    channels = _start_heater_channels((UPPER_HEATER_PIN,), int(pwm_freq), {UPPER_HEATER_PIN: 1.0})
+    _test_heater_channels = channels
+    start = time.time()
+
+    try:
+        for ch in channels:
+            ch["pwm"].ChangeDutyCycle(duty)
+            ch["duty"] = duty
+        while (time.time() - start) < duration_s:
+            if _heater_test_stop:
+                print("[Incubation] Upper heater TEST aborted.")
+                break
+            elapsed = time.time() - start
+            remaining = max(0.0, duration_s - elapsed)
+            try:
+                temp_c = _read_ds18b20_c()
+            except RuntimeError:
+                temp_c = float("nan")
+            print(
+                f"[Incubation] TEST {temp_c:.2f}C -> upper {duty:.0f}% "
+                f"({remaining / 60.0:.1f} min left)"
+            )
+            if on_tick is not None:
+                try:
+                    on_tick(elapsed, remaining, temp_c, float("nan"))
+                except Exception:
+                    pass
+            time.sleep(poll_seconds)
+    finally:
+        for ch in list(channels):
+            _stop_channel(ch)
+        if _test_heater_channels is channels:
+            _test_heater_channels = []
+        print("[Incubation] Upper heater TEST complete — OFF.")
 
 
