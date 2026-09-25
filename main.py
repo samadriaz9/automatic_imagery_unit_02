@@ -9,8 +9,8 @@ Petri dishes: STEP=10, DIR=22 (BCM); EN tied on hardware (see petri_dishes.py).
 Media dispensor: STEP=24, DIR=27 (BCM); physical pins 18 & 13 (see Media_dispensor.py).
 Suction pipe: STEP=8, DIR=20 (BCM); no limit switch — use up/down with steps only (see suction_pipe.py).
 Incubator lid: STEP=6, DIR=16, LIMIT=17 (BCM); physical pins 31, 36 & 11 (see incubator_lid.py).
-Incubation heaters: lower BTS GPIO 12 (pin 32), upper BTS GPIO 26 (pin 37, +30% duty); see incubation_module.py.
-Filtration solenoid: was GPIO 26 — confirm wiring if solenoid and lower heater share hardware.
+Incubation heaters: lower BTS GPIO 26 (pin 37), upper BTS GPIO 12 (pin 32, +30% duty); see incubation_module.py.
+Filtration solenoid: confirm wiring if it shares hardware with a heater pin.
 
 Shutdown: Ctrl+C runs full cleanup (see shutdown_all). SIGTERM (kill) also cleans up.
 """

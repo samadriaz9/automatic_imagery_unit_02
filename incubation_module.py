@@ -191,7 +191,7 @@ def Start_incubation(
     Maintain incubation temperature using PID + one or more BTS PWM heater outputs.
 
     Both heaters use the same DS18B20 reading and PID output. The upper heater
-    (GPIO 26 / pin 37) receives 30% more duty than the lower (GPIO 12 / pin 32).
+    (GPIO 12 / pin 32) receives 30% more duty than the lower (GPIO 26 / pin 37).
 
     Lower heater is switched off (upper only) when temperature reaches
     ``target - lower_off_below_target_c`` (default 3 °C), to reduce lid vapour.
