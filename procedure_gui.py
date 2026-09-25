@@ -30,7 +30,12 @@ from device_config import (
     STEP_INCUBATION_MINUTES,
     STEP_INCUBATION_TEMP_C,
 )
-from incubation_module import Start_incubation, release_incubation_heaters, test_upper_heater
+from incubation_module import (
+    Start_incubation,
+    release_incubation_heaters,
+    test_lower_heater,
+    test_upper_heater,
+)
 from workflow_steps import (
     capture_petri_dishes,
     run_incubation_imaging_study,
@@ -236,6 +241,7 @@ class ProcedureGUI:
             ("Shift for Incubation", step_03_shift_for_incubation),
             ("Start Incubation", None),
             ("Test Upper Heater", None),
+            ("Test Lower Heater", None),
         ]:
             self._mk_left_btn(left_steps, label, fn).pack(fill=tk.X, pady=LEFT_BTN_GAP)
 
@@ -1014,6 +1020,9 @@ class ProcedureGUI:
                 elif title == "Test Upper Heater":
                     self._do_test_upper_heater()
                     self._log_msg(f"Done: {title}")
+                elif title == "Test Lower Heater":
+                    self._do_test_lower_heater()
+                    self._log_msg(f"Done: {title}")
                 elif title == "Take Pictures":
                     self._do_pictures()
                     self._log_msg(f"Done: {title}")
@@ -1100,6 +1109,10 @@ class ProcedureGUI:
     def _do_test_upper_heater(self):
         self._log_msg("Test Upper Heater: 50% for 5 min (upper only)")
         test_upper_heater(on_tick=self._incubation_tick)
+
+    def _do_test_lower_heater(self):
+        self._log_msg("Test Lower Heater: 50% for 5 min (lower only)")
+        test_lower_heater(on_tick=self._incubation_tick)
 
     def _do_pictures(self):
         n = max(1, min(MAX_PETRI_DISHES, int(self._petri_count.get())))

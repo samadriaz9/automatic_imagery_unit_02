@@ -16,10 +16,16 @@ UPPER_HEATER_DUTY_BOOST = 1.30  # upper runs 30% hotter than lower (same PID bas
 PRE_IMAGING_COOL_DOWN_MIN = 5.0
 # Legacy alias used by older call sites / docs.
 LOWER_HEATER_OFF_REMAINING_MIN = PRE_IMAGING_COOL_DOWN_MIN
-# Manual upper-heater self-test (GUI button).
-UPPER_HEATER_TEST_DUTY = 50.0
-UPPER_HEATER_TEST_MINUTES = 5.0
-UPPER_HEATER_TEST_PWM_FREQ = 100
+# Manual heater self-test (GUI buttons).
+HEATER_TEST_DUTY = 50.0
+HEATER_TEST_MINUTES = 5.0
+HEATER_TEST_PWM_FREQ = 100
+UPPER_HEATER_TEST_DUTY = HEATER_TEST_DUTY
+UPPER_HEATER_TEST_MINUTES = HEATER_TEST_MINUTES
+UPPER_HEATER_TEST_PWM_FREQ = HEATER_TEST_PWM_FREQ
+LOWER_HEATER_TEST_DUTY = HEATER_TEST_DUTY
+LOWER_HEATER_TEST_MINUTES = HEATER_TEST_MINUTES
+LOWER_HEATER_TEST_PWM_FREQ = HEATER_TEST_PWM_FREQ
 # Once sample is this many °C below target, lower stays off (upper finishes ramp).
 # Example: target 37 °C → lower off from 34 °C onward to reduce lid vapour.
 LOWER_HEATER_OFF_BELOW_TARGET_C = 3.0
@@ -438,41 +444,32 @@ def keep_temperature_pid(temperature_to_keep_c, minutes, **kwargs):
     return Start_incubation(temperature_to_keep_c, minutes, **kwargs)
 
 
-def test_upper_heater(
-    duty_percent=None,
-    duration_minutes=None,
-    pwm_freq=None,
+def _test_single_heater(
+    pin,
+    label,
+    duty_percent,
+    duration_minutes,
+    pwm_freq,
     on_tick=None,
     poll_seconds=2.0,
 ):
-    """
-    Switch on the upper heater only at a fixed duty for a short self-test.
-
-    Default: 50% for 5 minutes. Lower heater stays off. Call ``stop_heater_test()``
-    or ``release_incubation_heaters()`` to abort early (e.g. GUI Close).
-    """
+    """Run one heater at a fixed duty for a self-test; the other stays off."""
     global _heater_test_stop, _test_heater_channels
-
-    if duty_percent is None:
-        duty_percent = UPPER_HEATER_TEST_DUTY
-    if duration_minutes is None:
-        duration_minutes = UPPER_HEATER_TEST_MINUTES
-    if pwm_freq is None:
-        pwm_freq = UPPER_HEATER_TEST_PWM_FREQ
 
     duty = max(0.0, min(100.0, float(duty_percent)))
     duration_s = max(0.0, float(duration_minutes) * 60.0)
     poll_seconds = max(0.2, float(poll_seconds))
+    pin = int(pin)
 
     stop_heater_test()
     release_incubation_heaters()
     _heater_test_stop = False
 
     print(
-        f"[Incubation] Upper heater TEST: {duty:.0f}% for {duration_minutes:g} min "
-        f"(GPIO {UPPER_HEATER_PIN})"
+        f"[Incubation] {label} heater TEST: {duty:.0f}% for {duration_minutes:g} min "
+        f"(GPIO {pin})"
     )
-    channels = _start_heater_channels((UPPER_HEATER_PIN,), int(pwm_freq), {UPPER_HEATER_PIN: 1.0})
+    channels = _start_heater_channels((pin,), int(pwm_freq), {pin: 1.0})
     _test_heater_channels = channels
     start = time.time()
 
@@ -482,7 +479,7 @@ def test_upper_heater(
             ch["duty"] = duty
         while (time.time() - start) < duration_s:
             if _heater_test_stop:
-                print("[Incubation] Upper heater TEST aborted.")
+                print(f"[Incubation] {label} heater TEST aborted.")
                 break
             elapsed = time.time() - start
             remaining = max(0.0, duration_s - elapsed)
@@ -491,7 +488,7 @@ def test_upper_heater(
             except RuntimeError:
                 temp_c = float("nan")
             print(
-                f"[Incubation] TEST {temp_c:.2f}C -> upper {duty:.0f}% "
+                f"[Incubation] TEST {temp_c:.2f}C -> {label.lower()} {duty:.0f}% "
                 f"({remaining / 60.0:.1f} min left)"
             )
             if on_tick is not None:
@@ -505,6 +502,66 @@ def test_upper_heater(
             _stop_channel(ch)
         if _test_heater_channels is channels:
             _test_heater_channels = []
-        print("[Incubation] Upper heater TEST complete — OFF.")
+        print(f"[Incubation] {label} heater TEST complete — OFF.")
+
+
+def test_upper_heater(
+    duty_percent=None,
+    duration_minutes=None,
+    pwm_freq=None,
+    on_tick=None,
+    poll_seconds=2.0,
+):
+    """
+    Switch on the upper heater only at a fixed duty for a short self-test.
+
+    Default: 50% for 5 minutes. Lower heater stays off. Call ``stop_heater_test()``
+    or ``release_incubation_heaters()`` to abort early (e.g. GUI Close).
+    """
+    if duty_percent is None:
+        duty_percent = UPPER_HEATER_TEST_DUTY
+    if duration_minutes is None:
+        duration_minutes = UPPER_HEATER_TEST_MINUTES
+    if pwm_freq is None:
+        pwm_freq = UPPER_HEATER_TEST_PWM_FREQ
+    return _test_single_heater(
+        UPPER_HEATER_PIN,
+        "Upper",
+        duty_percent,
+        duration_minutes,
+        pwm_freq,
+        on_tick=on_tick,
+        poll_seconds=poll_seconds,
+    )
+
+
+def test_lower_heater(
+    duty_percent=None,
+    duration_minutes=None,
+    pwm_freq=None,
+    on_tick=None,
+    poll_seconds=2.0,
+):
+    """
+    Switch on the lower heater only at a fixed duty for a short self-test.
+
+    Default: 50% for 5 minutes. Upper heater stays off. Call ``stop_heater_test()``
+    or ``release_incubation_heaters()`` to abort early (e.g. GUI Close).
+    """
+    if duty_percent is None:
+        duty_percent = LOWER_HEATER_TEST_DUTY
+    if duration_minutes is None:
+        duration_minutes = LOWER_HEATER_TEST_MINUTES
+    if pwm_freq is None:
+        pwm_freq = LOWER_HEATER_TEST_PWM_FREQ
+    return _test_single_heater(
+        LOWER_HEATER_PIN,
+        "Lower",
+        duty_percent,
+        duration_minutes,
+        pwm_freq,
+        on_tick=on_tick,
+        poll_seconds=poll_seconds,
+    )
 
 
